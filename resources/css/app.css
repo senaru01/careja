@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    body {
+        @apply text-slate-800;
+        background-color: #e4ebf8;
+        /* Faint kawung batik texture over the soft blue gradient. */
+        background-image:
+            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 48 48'%3E%3Cg fill='none' stroke='%231e40af' stroke-opacity='0.05' stroke-width='1.2'%3E%3Cellipse cx='24' cy='11' rx='6.5' ry='10'/%3E%3Cellipse cx='24' cy='37' rx='6.5' ry='10'/%3E%3Cellipse cx='11' cy='24' rx='10' ry='6.5'/%3E%3Cellipse cx='37' cy='24' rx='10' ry='6.5'/%3E%3C/g%3E%3Cg fill='%231e40af' fill-opacity='0.06'%3E%3Ccircle cx='24' cy='24' r='2.4'/%3E%3Ccircle cx='0' cy='0' r='2'/%3E%3Ccircle cx='48' cy='0' r='2'/%3E%3Ccircle cx='0' cy='48' r='2'/%3E%3Ccircle cx='48' cy='48' r='2'/%3E%3C/g%3E%3C/svg%3E"),
+            radial-gradient(at 0% 0%, #d3e0fb 0px, transparent 50%),
+            radial-gradient(at 100% 100%, #c9d8f8 0px, transparent 45%),
+            radial-gradient(at 100% 0%, #edf2fc 0px, transparent 50%);
+        background-attachment: fixed;
+    }
+}
+
+@layer components {
+    /* White rounded surface used for every card, table and form. */
+    .panel {
+        @apply bg-white/90 backdrop-blur rounded-3xl shadow-soft ring-1 ring-white/70;
+    }
+
+    /* Rounded pill used for brand marks and small chips. */
+    .pill {
+        @apply inline-flex items-center rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200/60;
+    }
+}
