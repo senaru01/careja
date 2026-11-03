@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\PaymentDemoController;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class UserApprovalController extends Controller
@@ -18,6 +21,7 @@ class UserApprovalController extends Controller
         $status = $request->query('status', 'all');
 
         $users = User::query()
+            ->where('email', '!=', PaymentDemoController::DEMO_EMAIL)
             ->when($status === 'pending', fn ($query) => $query->pending())
             ->when($status === 'approved', fn ($query) => $query->whereNotNull('approved_at'))
             ->latest()
@@ -27,7 +31,7 @@ class UserApprovalController extends Controller
         return view('admin.users.index', [
             'users' => $users,
             'status' => $status,
-            'pendingCount' => User::pending()->count(),
+            'pendingCount' => User::pending()->where('email', '!=', PaymentDemoController::DEMO_EMAIL)->count(),
             'twoFactorGloballyEnabled' => config('careja.two_factor_enabled'),
         ]);
     }
@@ -66,6 +70,32 @@ class UserApprovalController extends Controller
         $state = $user->two_factor_enabled ? 'diaktifkan' : 'dimatikan';
 
         return back()->with('status', "Verifikasi 2 langkah untuk {$user->email} {$state}.");
+    }
+
+    /**
+     * Replace a user's password with a random temporary one, shown once to
+     * the admin to hand over. The user is logged out everywhere.
+     */
+    public function resetPassword(Request $request, User $user): RedirectResponse
+    {
+        if ($user->is($request->user())) {
+            return back()->withErrors(['user' => 'Ubah password Anda sendiri lewat menu Profil.']);
+        }
+
+        $temporaryPassword = Str::password(10, symbols: false);
+
+        $user->forceFill([
+            'password' => $temporaryPassword,
+            'remember_token' => Str::random(60),
+        ])->save();
+
+        if (config('session.driver') === 'database') {
+            DB::table(config('session.table', 'sessions'))->where('user_id', $user->id)->delete();
+        }
+
+        return back()
+            ->with('status', "Password {$user->email} telah direset.")
+            ->with('temporaryPassword', ['email' => $user->email, 'password' => $temporaryPassword]);
     }
 
     /**

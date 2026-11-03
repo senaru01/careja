@@ -7,6 +7,7 @@ use App\Http\Controllers\CandidateController;
 use App\Http\Controllers\CandidatePhotoController;
 use App\Http\Controllers\Company\ExamSessionController as CompanyExamSessionController;
 use App\Http\Controllers\Company\InterviewController;
+use App\Http\Controllers\Company\InterviewPaymentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\Lpk\AttemptEvaluationController;
@@ -19,12 +20,14 @@ use App\Http\Controllers\Lpk\ExamQuestionController;
 use App\Http\Controllers\Lpk\ExamRescheduleController;
 use App\Http\Controllers\Lpk\QuestionCategoryController;
 use App\Http\Controllers\MidtransNotificationController;
+use App\Http\Controllers\PaymentDemoController;
 use App\Http\Controllers\PaymentStatusController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Worker\CandidateProfileController;
 use App\Http\Controllers\Worker\DocumentController as WorkerDocumentController;
 use App\Http\Controllers\Worker\ExamAttemptController;
 use App\Http\Controllers\Worker\ExamSessionController;
+use App\Http\Controllers\Worker\MedicalPaymentController;
 use App\Http\Controllers\Worker\PaymentController as WorkerPaymentController;
 use App\Http\Controllers\Worker\PhotoController;
 use App\Http\Controllers\Worker\QrisPaymentController;
@@ -40,6 +43,15 @@ Route::get('/', function () {
 Route::post('midtrans/notification', MidtransNotificationController::class)
     ->middleware('throttle:60,1')
     ->name('midtrans.notification');
+
+// Payment demo for the Midtrans review: real QRIS charges for every catalog
+// item, behind a secret key in the URL, without login.
+Route::middleware('payment-demo')->prefix('demo-pembayaran/{demoKey}')->name('payment-demo.')->group(function () {
+    Route::get('/', [PaymentDemoController::class, 'index'])->name('index');
+    Route::post('/', [PaymentDemoController::class, 'store'])->middleware('throttle:10,1')->name('store');
+    Route::get('bayar/{payment}', [PaymentDemoController::class, 'show'])->name('show');
+    Route::get('bayar/{payment}/status', [PaymentDemoController::class, 'status'])->middleware('throttle:30,1')->name('status');
+});
 
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
@@ -79,6 +91,8 @@ Route::middleware('auth')->group(function () {
         Route::post('sesi-tes/{exam}/daftar', [ExamSessionController::class, 'store'])->middleware('throttle:10,1')->name('sessions.register');
         Route::post('sesi-tes/{exam}/keluar', [ExamSessionController::class, 'withdraw'])->name('sessions.withdraw');
 
+        Route::post('wawancara/{interview}/medical/bayar', [MedicalPaymentController::class, 'store'])->middleware('throttle:5,1')->name('medical-payment.store');
+
         Route::get('tes/{attempt}', [ExamAttemptController::class, 'show'])->name('attempts.show');
         Route::post('tes/{attempt}/mulai', [ExamAttemptController::class, 'start'])->name('attempts.start');
         Route::post('tes/{attempt}/kirim', [ExamAttemptController::class, 'submit'])->name('attempts.submit');
@@ -90,6 +104,27 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:lpk,company,super_admin')->group(function () {
         Route::get('kandidat', [CandidateController::class, 'index'])->name('candidates.index');
         Route::get('kandidat/{candidate}', [CandidateController::class, 'show'])->name('candidates.show');
+    });
+
+    /*
+     * Question bank: LPK staff for their own LPK, super admin for every LPK.
+     */
+    Route::middleware('role:lpk,super_admin')->prefix('lpk')->name('lpk.')->group(function () {
+        Route::get('bank-soal', [QuestionCategoryController::class, 'index'])->name('categories.index');
+        Route::get('bank-soal/template-excel', [BankQuestionImportController::class, 'template'])->name('bank.template');
+        Route::post('bank-soal', [QuestionCategoryController::class, 'store'])->name('categories.store');
+        Route::get('bank-soal/{category}', [QuestionCategoryController::class, 'show'])->name('categories.show');
+        Route::get('bank-soal/{category}/ubah', [QuestionCategoryController::class, 'edit'])->name('categories.edit');
+        Route::put('bank-soal/{category}', [QuestionCategoryController::class, 'update'])->name('categories.update');
+        Route::delete('bank-soal/{category}', [QuestionCategoryController::class, 'destroy'])->name('categories.destroy');
+        Route::post('bank-soal/{category}/import', [BankQuestionImportController::class, 'store'])->name('categories.import');
+
+        Route::scopeBindings()->group(function () {
+            Route::post('bank-soal/{category}/soal', [BankQuestionController::class, 'store'])->name('categories.questions.store');
+            Route::get('bank-soal/{category}/soal/{question}/ubah', [BankQuestionController::class, 'edit'])->name('categories.questions.edit');
+            Route::put('bank-soal/{category}/soal/{question}', [BankQuestionController::class, 'update'])->name('categories.questions.update');
+            Route::delete('bank-soal/{category}/soal/{question}', [BankQuestionController::class, 'destroy'])->name('categories.questions.destroy');
+        });
     });
 
     /*
@@ -106,21 +141,6 @@ Route::middleware('auth')->group(function () {
         Route::post('ujian/{exam}/terbitkan', [ExamPublicationController::class, 'store'])->middleware('throttle:5,1')->name('exams.publish');
         Route::post('ujian/{exam}/jadwal', [ExamRescheduleController::class, 'store'])->name('exams.reschedule');
 
-        Route::get('bank-soal', [QuestionCategoryController::class, 'index'])->name('categories.index');
-        Route::get('bank-soal/template-excel', [BankQuestionImportController::class, 'template'])->name('bank.template');
-        Route::post('bank-soal', [QuestionCategoryController::class, 'store'])->name('categories.store');
-        Route::get('bank-soal/{category}', [QuestionCategoryController::class, 'show'])->name('categories.show');
-        Route::get('bank-soal/{category}/ubah', [QuestionCategoryController::class, 'edit'])->name('categories.edit');
-        Route::put('bank-soal/{category}', [QuestionCategoryController::class, 'update'])->name('categories.update');
-        Route::delete('bank-soal/{category}', [QuestionCategoryController::class, 'destroy'])->name('categories.destroy');
-        Route::post('bank-soal/{category}/import', [BankQuestionImportController::class, 'store'])->name('categories.import');
-
-        Route::scopeBindings()->group(function () {
-            Route::post('bank-soal/{category}/soal', [BankQuestionController::class, 'store'])->name('categories.questions.store');
-            Route::get('bank-soal/{category}/soal/{question}/ubah', [BankQuestionController::class, 'edit'])->name('categories.questions.edit');
-            Route::put('bank-soal/{category}/soal/{question}', [BankQuestionController::class, 'update'])->name('categories.questions.update');
-            Route::delete('bank-soal/{category}/soal/{question}', [BankQuestionController::class, 'destroy'])->name('categories.questions.destroy');
-        });
         Route::put('hasil-tes/{attempt}/evaluasi', [AttemptEvaluationController::class, 'update'])->name('attempts.evaluate');
     });
 
@@ -130,6 +150,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:company')->prefix('perusahaan')->name('company.')->group(function () {
         Route::get('sesi-tes', [CompanyExamSessionController::class, 'index'])->name('sessions.index');
         Route::get('sesi-tes/{exam}', [CompanyExamSessionController::class, 'show'])->name('sessions.show');
+        Route::post('sesi-tes/{exam}/bayar', [InterviewPaymentController::class, 'store'])->middleware('throttle:5,1')->name('sessions.payment.store');
         Route::post('sesi-tes/{exam}/undang', [InterviewController::class, 'store'])->name('interviews.store');
 
         Route::get('wawancara', [InterviewController::class, 'index'])->name('interviews.index');
@@ -145,6 +166,7 @@ Route::middleware('auth')->group(function () {
         Route::patch('users/{user}/approve', [UserApprovalController::class, 'approve'])->name('users.approve');
         Route::patch('users/{user}/revoke', [UserApprovalController::class, 'revoke'])->name('users.revoke');
         Route::patch('users/{user}/two-factor', [UserApprovalController::class, 'toggleTwoFactor'])->name('users.two-factor');
+        Route::patch('users/{user}/password', [UserApprovalController::class, 'resetPassword'])->middleware('throttle:10,1')->name('users.password');
         Route::delete('users/{user}', [UserApprovalController::class, 'destroy'])->name('users.destroy');
 
         Route::get('pembayaran', [AdminPaymentController::class, 'index'])->name('payments.index');

@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\PaymentMethod;
+use App\Enums\PaymentPurpose;
 use App\Enums\PaymentStatus;
 use App\Models\Payment;
 use App\Models\User;
@@ -38,8 +39,16 @@ class PaymentFactory extends Factory
     }
 
     /**
-     * A verified payment whose membership period has already ended.
+     * A payment for another catalog item than the membership, at its listed price.
      */
+    public function purpose(PaymentPurpose $purpose): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'purpose' => $purpose,
+            'amount' => $purpose->fee(),
+        ]);
+    }
+
     /**
      * A pending Midtrans QRIS payment waiting to be scanned.
      */
@@ -54,6 +63,9 @@ class PaymentFactory extends Factory
         ]);
     }
 
+    /**
+     * A verified payment whose membership period has already ended.
+     */
     public function expired(): static
     {
         return $this->state(fn (array $attributes) => [

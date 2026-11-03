@@ -4,9 +4,11 @@ namespace Tests\Feature\Recruitment;
 
 use App\Enums\InterviewStatus;
 use App\Enums\MedicalStatus;
+use App\Enums\PaymentPurpose;
 use App\Models\Exam;
 use App\Models\ExamAttempt;
 use App\Models\Interview;
+use App\Models\Payment;
 use App\Models\User;
 use App\Notifications\InterviewScheduled;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -37,6 +39,12 @@ class InterviewTest extends TestCase
         $this->company = User::factory()->company($this->exam->company)->create();
         $this->passed = collect([95, 90, 85, 80])->map(fn (int $score) => ExamAttempt::factory()->for($this->exam)->passed($score)->create());
         ExamAttempt::factory()->for($this->exam)->failed()->create();
+        Payment::factory()->purpose(PaymentPurpose::InterviewAccess)->verified()->for($this->company)->create(['exam_id' => $this->exam->id]);
+    }
+
+    private function payMedical(Interview $interview): void
+    {
+        Payment::factory()->purpose(PaymentPurpose::MedicalCheckup)->verified()->create(['user_id' => $interview->user_id, 'interview_id' => $interview->id]);
     }
 
     /**
@@ -183,6 +191,7 @@ class InterviewTest extends TestCase
     public function test_medical_checkup_is_recorded_once_after_a_passed_interview(): void
     {
         $interview = Interview::factory()->for($this->company->organization)->create(['status' => InterviewStatus::Passed]);
+        $this->payMedical($interview);
 
         $this->actingAs($this->company)->put(route('company.interviews.medical', $interview), [
             'medical_status' => 'fit',
@@ -213,6 +222,7 @@ class InterviewTest extends TestCase
         $this->actingAs($this->company)->post(route('company.interviews.store', $this->exam), $this->invite([$this->userId(1), $this->userId(2)]));
         $first = Interview::where('user_id', $this->userId(1))->firstOrFail();
         $first->forceFill(['status' => InterviewStatus::Passed])->save();
+        $this->payMedical($first);
 
         $this->actingAs($this->company)->put(route('company.interviews.medical', $first), [
             'medical_status' => 'unfit',

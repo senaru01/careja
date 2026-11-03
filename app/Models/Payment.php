@@ -34,6 +34,7 @@ class Payment extends Model
             'verified_at' => 'datetime',
             'expires_at' => 'datetime',
             'payment_due_at' => 'datetime',
+            'is_demo' => 'boolean',
         ];
     }
 
@@ -46,6 +47,7 @@ class Payment extends Model
     protected function active(Builder $query): void
     {
         $query->where('purpose', PaymentPurpose::Membership)
+            ->where('is_demo', false)
             ->where('status', PaymentStatus::Verified)
             ->where('expires_at', '>', now());
     }
@@ -87,6 +89,36 @@ class Payment extends Model
     public function exam(): BelongsTo
     {
         return $this->belongsTo(Exam::class);
+    }
+
+    /**
+     * Scope a query to verified payments made through the real flow (not the demo page).
+     *
+     * @param  Builder<Payment>  $query
+     */
+    #[Scope]
+    protected function paid(Builder $query): void
+    {
+        $query->where('status', PaymentStatus::Verified)->where('is_demo', false);
+    }
+
+    /**
+     * @param  Builder<Payment>  $query
+     */
+    #[Scope]
+    protected function pending(Builder $query): void
+    {
+        $query->where('status', PaymentStatus::Pending)->where('is_demo', false);
+    }
+
+    /**
+     * The interview a medical checkup payment is for.
+     *
+     * @return BelongsTo<Interview, $this>
+     */
+    public function interview(): BelongsTo
+    {
+        return $this->belongsTo(Interview::class);
     }
 
     /**
@@ -136,7 +168,7 @@ class Payment extends Model
             'note' => null,
             'verified_by' => $verifier?->id,
             'verified_at' => now(),
-            'expires_at' => $this->isMembership() ? now()->addMonths(config('careja.membership_months')) : null,
+            'expires_at' => $this->isMembership() && ! $this->is_demo ? now()->addMonths(config('careja.membership_months')) : null,
         ])->save();
     }
 

@@ -34,6 +34,27 @@
                     supaya semua peserta punya kesempatan yang sama.
                 </div>
             @else
+                @unless ($interviewAccessPaid)
+                    @if ($pendingInterviewPayment)
+                        @include('payments.partials.qris-waiter', ['payment' => $pendingInterviewPayment, 'caption' => 'Pengambilan kandidat wawancara · terbuka otomatis setelah dibayar'])
+                    @else
+                        <x-card title="Pengambilan Kandidat Wawancara">
+                            <p class="text-sm text-slate-600">
+                                Untuk mengundang kandidat dari peringkat sesi ini, bayar biaya pengambilan kandidat
+                                <strong>Rp {{ number_format($interviewFee, 0, ',', '.') }}</strong> sekali per sesi tes (bebas mengundang sesuai kuota, termasuk pengganti).
+                            </p>
+                            @if ($qrisAvailable)
+                                <form method="POST" action="{{ route('company.sessions.payment.store', $exam) }}" class="mt-4">
+                                    @csrf
+                                    <x-primary-button>Bayar via QRIS</x-primary-button>
+                                </form>
+                            @else
+                                <p class="mt-4 text-sm text-amber-700">Pembayaran QRIS otomatis belum tersedia. Hubungi admin@careja.id.</p>
+                            @endif
+                        </x-card>
+                    @endif
+                @endunless
+
                 <form method="POST" action="{{ route('company.interviews.store', $exam) }}" class="space-y-6">
                     @csrf
                     <x-card title="Peringkat Final">
@@ -45,7 +66,7 @@
                         <x-input-error :messages="$errors->get('user_ids')" class="mt-2" />
                     </x-card>
 
-                    @if ($openSeats > 0 && $ranking->count() > $interviews->count())
+                    @if ($canSelect && $openSeats > 0 && $ranking->count() > $interviews->count())
                         <x-card title="Undang Wawancara">
                             <div class="grid sm:grid-cols-2 gap-4">
                                 <div>

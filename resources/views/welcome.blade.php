@@ -17,7 +17,8 @@
 
         <header class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-5 flex justify-between items-center">
             <a href="/" class="inline-flex items-center rounded-full bg-white px-4 py-1.5 shadow-sm ring-1 ring-slate-200/60"><x-application-logo class="h-8" /></a>
-            <nav class="flex gap-3">
+            <nav class="flex items-center gap-3">
+                <a href="#biaya" class="hidden sm:inline text-sm font-semibold text-blue-800 hover:underline">Biaya</a>
                 @auth
                     <a href="{{ route('dashboard') }}"><x-primary-button type="button">Dashboard</x-primary-button></a>
                 @else
@@ -128,6 +129,59 @@
                 </div>
             </section>
 
+            {{-- Payment catalog --}}
+            <section id="biaya" class="max-w-7xl mx-auto px-4 sm:px-6 pb-20 scroll-mt-6">
+                <div class="text-sm font-semibold text-blue-700">Katalog Pembayaran</div>
+                <h2 class="mt-2 text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900">Biaya layanan Careja</h2>
+                <p class="mt-3 max-w-2xl text-slate-600">Semua biaya diumumkan terbuka di sini dan dibayar melalui QRIS (Midtrans). Tidak ada biaya tersembunyi di luar daftar berikut.</p>
+
+                <div class="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                    @foreach ([
+                        ['Pencari Kerja', 'Keanggotaan Pencari Kerja', $rupiah('careja.registration_fee'), 'per tahun', [
+                            'Aktif '.config('careja.membership_months').' bulan sejak pembayaran',
+                            'Profil & CV terlihat oleh LPK dan perusahaan',
+                            'Notifikasi setiap ada sesi tes baru',
+                        ]],
+                        ['Pencari Kerja', 'Biaya Ikut Sesi Tes', $rupiah('careja.exam_registration_fee'), 'per sesi tes', [
+                            'Tes online untuk satu sesi pilihan',
+                            'Nilai dihitung otomatis & peringkat terbuka',
+                            'Token pengganti bila jadwal dimundurkan',
+                        ]],
+                        ['Perusahaan', 'Pengambilan Kandidat Wawancara', $rupiah('careja.interview_fee'), 'per sesi tes', [
+                            'Akses peringkat lengkap peserta sesi',
+                            'Undang kandidat wawancara sesuai kuota',
+                            'Riwayat seleksi & alasan tercatat terbuka',
+                        ]],
+                        ['Kandidat', 'Medical Checkup', $rupiah('careja.medical_checkup_fee'), 'per kandidat', [
+                            'Pemeriksaan kesehatan tahap akhir',
+                            'Untuk kandidat yang lolos wawancara',
+                            'Hasil tercatat di riwayat seleksi',
+                        ]],
+                    ] as [$payer, $title, $price, $unit, $features])
+                        <div class="panel relative flex flex-col overflow-hidden p-6">
+                            <x-batik.kawung class="text-blue-600/[0.07] [mask-image:linear-gradient(to_bottom_left,black,transparent_60%)]" size="36" />
+                            <span class="relative self-start rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-800 ring-1 ring-blue-200">{{ $payer }}</span>
+                            <div class="relative mt-4 font-semibold text-slate-900">{{ $title }}</div>
+                            <div class="relative mt-3">
+                                <span class="text-3xl font-extrabold text-blue-700">{{ $price }}</span>
+                                <span class="text-sm text-slate-500">/ {{ $unit }}</span>
+                            </div>
+                            <ul class="relative mt-4 space-y-2 text-sm text-slate-600">
+                                @foreach ($features as $feature)
+                                    <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-600"></span>{{ $feature }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endforeach
+                </div>
+
+                <p class="mt-6 text-xs text-slate-500">
+                    Penerbitan sesi tes oleh LPK: {{ $rupiah('careja.exam_session_fee') }} per sesi. Semua harga dalam Rupiah.
+                    Pembayaran yang telah berhasil tidak dapat dikembalikan, kecuali ketentuan token pengganti saat jadwal sesi dimundurkan.
+                    Pertanyaan pembayaran: <a href="mailto:admin@careja.id" class="text-blue-700 hover:underline">admin@careja.id</a>.
+                </p>
+            </section>
+
             {{-- Parties --}}
             <section class="max-w-7xl mx-auto px-4 sm:px-6 pb-20">
                 <div class="relative overflow-hidden rounded-[2.5rem] bg-blue-950 p-8 sm:p-12 text-white">
@@ -149,11 +203,23 @@
                     </div>
                 </div>
             </section>
+
+            {{-- Contact --}}
+            <section class="max-w-7xl mx-auto px-4 sm:px-6 pb-20">
+                <div class="panel flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-6 sm:p-8">
+                    <div>
+                        <div class="text-sm font-semibold text-blue-700">Kontak Admin</div>
+                        <h2 class="mt-1 text-2xl font-semibold tracking-tight text-slate-900">Ada pertanyaan? Hubungi kami.</h2>
+                        <p class="mt-1 text-sm text-slate-500">Tim admin Careja siap membantu soal pendaftaran, pembayaran, dan sesi tes.</p>
+                    </div>
+                    <a href="mailto:admin@careja.id" class="inline-flex items-center justify-center rounded-full bg-blue-700 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-800">admin@careja.id</a>
+                </div>
+            </section>
         </main>
 
         <footer class="relative">
             <x-batik.parang class="h-3 text-blue-800/40" />
-            <div class="py-6 text-center text-xs text-slate-500">&copy; {{ date('Y') }} Careja · Cari Kerja yang Transparan, ya di Careja.</div>
+            <div class="py-6 text-center text-xs text-slate-500">&copy; {{ date('Y') }} Careja · Cari Kerja yang Transparan, ya di Careja. · Kontak: <a href="mailto:admin@careja.id" class="text-blue-700 hover:underline">admin@careja.id</a></div>
         </footer>
     </body>
 </html>

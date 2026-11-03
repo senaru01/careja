@@ -4,11 +4,13 @@ namespace App\Models;
 
 use App\Enums\InterviewStatus;
 use App\Enums\MedicalStatus;
+use App\Enums\PaymentPurpose;
 use Database\Factories\InterviewFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['scheduled_at', 'location', 'notes'])]
 class Interview extends Model
@@ -70,6 +72,44 @@ class Interview extends Model
     public function medicalChecker(): BelongsTo
     {
         return $this->belongsTo(User::class, 'medical_checked_by');
+    }
+
+    /**
+     * Medical checkup payments for this interview.
+     *
+     * @return HasMany<Payment, $this>
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    /**
+     * Determine if the candidate paid the medical checkup fee.
+     */
+    public function hasPaidMedicalCheckup(): bool
+    {
+        return $this->payments()->where('purpose', PaymentPurpose::MedicalCheckup)->paid()->exists();
+    }
+
+    /**
+     * The open QRIS payment for the medical checkup, if the candidate started one.
+     */
+    public function pendingMedicalPayment(): ?Payment
+    {
+        return $this->payments()
+            ->where('purpose', PaymentPurpose::MedicalCheckup)
+            ->pending()
+            ->latest('id')
+            ->first();
+    }
+
+    /**
+     * Passed the interview, medical not recorded and not paid yet.
+     */
+    public function awaitsMedicalPayment(): bool
+    {
+        return $this->needsMedicalCheck() && ! $this->hasPaidMedicalCheckup();
     }
 
     public function isEvaluated(): bool

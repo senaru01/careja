@@ -20,7 +20,12 @@
                     <div class="panel p-6 flex flex-col justify-between gap-4">
                         <div>
                             <div class="flex items-start justify-between gap-3">
-                                <h3 class="text-lg font-semibold text-slate-900">{{ $category->name }}</h3>
+                                <div>
+                                    @if (auth()->user()->isSuperAdmin())
+                                        <x-badge color="blue">{{ $category->organization->name }}</x-badge>
+                                    @endif
+                                    <h3 class="mt-1 text-lg font-semibold text-slate-900">{{ $category->name }}</h3>
+                                </div>
                                 <div class="text-right">
                                     <div class="text-4xl font-semibold tracking-tight text-slate-900">{{ $category->questions_count }}</div>
                                     <div class="text-xs text-slate-500">soal</div>
@@ -48,6 +53,11 @@
                     <h3 class="text-lg font-semibold text-slate-900">Kategori Baru</h3>
                     <form method="POST" action="{{ route('lpk.categories.store') }}" class="mt-3 space-y-3">
                         @csrf
+                        @if (auth()->user()->isSuperAdmin())
+                            <x-select name="organization_id" class="block w-full" placeholder="Pilih LPK pemilik" required
+                                :options="$lpks->all()" :selected="old('organization_id', $lpks->count() === 1 ? $lpks->keys()->first() : null)" />
+                            <x-input-error :messages="$errors->get('organization_id')" />
+                        @endif
                         <x-text-input name="name" class="block w-full" placeholder="Nama kategori, mis. Bahasa Jepang" :value="old('name')" required />
                         <x-input-error :messages="$errors->get('name')" />
                         <x-textarea name="description" class="block w-full" rows="2" placeholder="Deskripsi (opsional)">{{ old('description') }}</x-textarea>

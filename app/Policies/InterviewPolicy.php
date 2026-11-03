@@ -32,9 +32,19 @@ class InterviewPolicy
             return Response::deny();
         }
 
-        return $interview->needsMedicalCheck()
-            ? Response::allow()
-            : Response::deny('Medical checkup hanya untuk kandidat yang lulus wawancara dan belum pernah dicatat.');
+        return match (true) {
+            ! $interview->needsMedicalCheck() => Response::deny('Medical checkup hanya untuk kandidat yang lulus wawancara dan belum pernah dicatat.'),
+            ! $interview->hasPaidMedicalCheckup() => Response::deny('Menunggu kandidat membayar biaya medical checkup.'),
+            default => Response::allow(),
+        };
+    }
+
+    /**
+     * The candidate pays the medical checkup fee after passing the interview.
+     */
+    public function payMedical(User $user, Interview $interview): bool
+    {
+        return $user->isWorker() && $user->id === $interview->user_id && $interview->awaitsMedicalPayment();
     }
 
     private function owns(User $user, Interview $interview): bool

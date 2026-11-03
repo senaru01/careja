@@ -1,6 +1,6 @@
-{{-- Live QRIS payment. Expects $payment (pending Midtrans Payment) and $caption (what is being paid). --}}
+{{-- Live QRIS payment. Expects $payment (pending Midtrans Payment) and $caption (what is being paid); $statusUrl overrides the polling URL. --}}
 <div class="panel relative overflow-hidden p-6 sm:p-8"
-     x-data="qrisWaiter(@js(route('payments.status', $payment)), {{ $payment->payment_due_at?->getTimestampMs() ?? 0 }})"
+     x-data="qrisWaiter(@js($statusUrl ?? route('payments.status', $payment)), {{ $payment->payment_due_at?->getTimestampMs() ?? 0 }})"
      x-init="start()">
     <x-batik.kawung class="text-blue-600/[0.05]" size="40" />
 

@@ -6,6 +6,7 @@ use App\Enums\PaymentMethod;
 use App\Enums\PaymentPurpose;
 use App\Enums\PaymentStatus;
 use App\Models\Exam;
+use App\Models\Interview;
 use App\Models\Payment;
 use App\Models\User;
 use Illuminate\Support\Carbon;
@@ -16,7 +17,7 @@ use Throwable;
 
 /**
  * Payments through Midtrans QRIS (membership, publishing a test session,
- * joining a test session): create the QR, keep the local payment in sync
+ * joining a test session, interview access, medical checkup): create the QR, keep the local payment in sync
  * with Midtrans and hand it to ExamSessions once paid.
  */
 class QrisPayments
@@ -59,15 +60,44 @@ class QrisPayments
     }
 
     /**
+     * QRIS the company pays once per finished session to invite candidates from its ranking.
+     */
+    public function startInterviewAccess(User $companyStaff, Exam $exam): ?Payment
+    {
+        return $this->start($companyStaff, PaymentPurpose::InterviewAccess, config('careja.interview_fee'),
+            'Pengambilan kandidat: '.$exam->position, $exam);
+    }
+
+    /**
+     * QRIS a candidate pays for the medical checkup after passing the interview.
+     */
+    public function startMedicalCheckup(User $worker, Interview $interview): ?Payment
+    {
+        return $this->start($worker, PaymentPurpose::MedicalCheckup, config('careja.medical_checkup_fee'),
+            'Medical checkup: '.$interview->organization->name, $interview->exam, $interview);
+    }
+
+    /**
+     * A real QRIS charge for the demo page: same price and item as the catalog,
+     * but confirming it changes nothing in the recruitment flow.
+     */
+    public function startDemo(User $demoUser, PaymentPurpose $purpose): ?Payment
+    {
+        return $this->start($demoUser, $purpose, $purpose->fee(), $purpose->label().' (Demo)', isDemo: true);
+    }
+
+    /**
      * Create a pending payment and a QRIS code for it. Returns null when
      * Midtrans refused or could not be reached (the payment is removed).
      */
-    public function start(User $user, PaymentPurpose $purpose, int $amount, string $itemName, ?Exam $exam = null): ?Payment
+    public function start(User $user, PaymentPurpose $purpose, int $amount, string $itemName, ?Exam $exam = null, ?Interview $interview = null, bool $isDemo = false): ?Payment
     {
         $payment = $user->payments()->make(['amount' => $amount]);
         $payment->forceFill([
             'purpose' => $purpose,
             'exam_id' => $exam?->id,
+            'interview_id' => $interview?->id,
+            'is_demo' => $isDemo,
             'method' => PaymentMethod::Midtrans,
             'status' => PaymentStatus::Pending,
         ])->save();
@@ -77,6 +107,7 @@ class QrisPayments
             $response = $this->midtrans->chargeQris(
                 $payment->gateway_order_id,
                 $payment->amount,
+                $purpose->value,
                 Str::limit($itemName, 50, ''),
                 ['first_name' => Str::limit($user->name, 50, ''), 'email' => $user->email],
                 config('services.midtrans.qris_expiry_minutes'),
@@ -182,7 +213,7 @@ class QrisPayments
         $notify = DB::transaction(function () use ($payment, $transaction) {
             $locked = Payment::query()->lockForUpdate()->find($payment->id);
 
-            if (! $locked?->applyGatewayStatus($transaction)) {
+            if (! $locked?->applyGatewayStatus($transaction) || $locked->is_demo) {
                 return null;
             }
 

@@ -31,17 +31,18 @@ class Midtrans
     /**
      * Create a QRIS transaction.
      *
+     * @param  string  $itemId  catalog item code, e.g. "membership"
      * @param  array{first_name: string, email: string}  $customer
      * @return array<string, mixed> Midtrans response (status_code 201 on success)
      *
      * @throws RequestException
      */
-    public function chargeQris(string $orderId, int $amount, string $itemName, array $customer, int $expiryMinutes): array
+    public function chargeQris(string $orderId, int $amount, string $itemId, string $itemName, array $customer, int $expiryMinutes): array
     {
         return $this->request()->post('/v2/charge', [
             'payment_type' => 'qris',
             'transaction_details' => ['order_id' => $orderId, 'gross_amount' => $amount],
-            'item_details' => [['id' => 'MEMBERSHIP', 'price' => $amount, 'quantity' => 1, 'name' => $itemName]],
+            'item_details' => [['id' => $itemId, 'price' => $amount, 'quantity' => 1, 'name' => $itemName]],
             'customer_details' => $customer,
             'qris' => ['acquirer' => 'gopay'],
             'custom_expiry' => ['expiry_duration' => $expiryMinutes, 'unit' => 'minute'],

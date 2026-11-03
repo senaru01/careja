@@ -118,6 +118,71 @@ class QuestionBankTest extends TestCase
         $this->assertModelExists($question);
     }
 
+    public function test_super_admin_sees_the_question_bank_of_every_lpk(): void
+    {
+        $first = Organization::factory()->lpk()->create(['name' => 'LPK Sakura']);
+        $second = Organization::factory()->lpk()->create(['name' => 'LPK Fuji']);
+        $first->questionCategories()->create(['name' => 'Bahasa Jepang']);
+        $second->questionCategories()->create(['name' => 'Kanji Dasar']);
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('lpk.categories.index'))
+            ->assertOk()
+            ->assertSee(['LPK Sakura', 'Bahasa Jepang', 'LPK Fuji', 'Kanji Dasar']);
+    }
+
+    public function test_super_admin_manages_questions_of_any_lpk(): void
+    {
+        $superAdmin = User::factory()->superAdmin()->create();
+        $category = QuestionCategory::factory()->withQuestions(1)->create();
+        $question = $category->questions()->first();
+
+        $this->actingAs($superAdmin)->get(route('lpk.categories.show', $category))->assertOk();
+        $this->actingAs($superAdmin)->post(route('lpk.categories.questions.store', $category), [
+            'question' => 'Ibu kota Jepang?', 'options' => ['Tokyo', 'Osaka'], 'correct_option' => 0,
+        ])->assertSessionHasNoErrors();
+        $this->actingAs($superAdmin)->delete(route('lpk.categories.questions.destroy', [$category, $question]));
+
+        $this->assertModelMissing($question);
+        $this->assertSame(['Ibu kota Jepang?'], $category->questions()->pluck('question')->all());
+    }
+
+    public function test_super_admin_creates_a_category_for_the_chosen_lpk(): void
+    {
+        $lpk = Organization::factory()->lpk()->create();
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->post(route('lpk.categories.store'), ['organization_id' => $lpk->id, 'name' => 'Bahasa Jepang'])
+            ->assertSessionHasNoErrors();
+
+        $this->assertTrue($lpk->questionCategories()->where('name', 'Bahasa Jepang')->exists());
+    }
+
+    public function test_super_admin_must_choose_an_lpk_for_a_new_category(): void
+    {
+        $company = Organization::factory()->company()->create();
+        $superAdmin = User::factory()->superAdmin()->create();
+
+        $this->actingAs($superAdmin)->post(route('lpk.categories.store'), ['name' => 'Tanpa LPK'])
+            ->assertSessionHasErrors('organization_id');
+        $this->actingAs($superAdmin)->post(route('lpk.categories.store'), ['organization_id' => $company->id, 'name' => 'Ke perusahaan'])
+            ->assertSessionHasErrors('organization_id');
+
+        $this->assertSame(0, QuestionCategory::whereIn('name', ['Tanpa LPK', 'Ke perusahaan'])->count());
+    }
+
+    public function test_lpk_can_not_create_a_category_for_another_lpk(): void
+    {
+        $lpk = User::factory()->lpk()->create();
+        $otherLpk = Organization::factory()->lpk()->create();
+
+        $this->actingAs($lpk)
+            ->post(route('lpk.categories.store'), ['organization_id' => $otherLpk->id, 'name' => 'Titipan'])
+            ->assertSessionHasErrors('organization_id');
+
+        $this->assertFalse($otherLpk->questionCategories()->where('name', 'Titipan')->exists());
+    }
+
     public function test_company_can_not_open_the_question_bank(): void
     {
         $this->actingAs(User::factory()->company()->create())->get(route('lpk.categories.index'))->assertForbidden();

@@ -39,7 +39,7 @@
                                 </td>
                                 <td class="px-4 py-3">
                                     Rp {{ number_format($payment->amount, 0, ',', '.') }}
-                                    <div class="text-xs text-slate-500">{{ $payment->purpose->label() }}@if ($payment->exam) · {{ $payment->exam->title }}@endif</div>
+                                    <div class="text-xs text-slate-500">@if ($payment->is_demo)<x-badge color="blue">Demo</x-badge> @endif{{ $payment->purpose->label() }}@if ($payment->exam) · {{ $payment->exam->title }}@endif</div>
                                 </td>
                                 <td class="px-4 py-3">{{ $payment->created_at->format('d M Y H:i') }}</td>
                                 <td class="px-4 py-3">

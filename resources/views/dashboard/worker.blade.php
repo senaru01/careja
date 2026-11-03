@@ -139,6 +139,26 @@
                                     <p class="mt-1 text-blue-900 whitespace-pre-line">{{ $interview->evaluation }}</p>
                                 </div>
                             @endif
+                            @if ($interview->needsMedicalCheck())
+                                @if ($pendingMedical = $interview->pendingMedicalPayment())
+                                    <div class="mt-2">
+                                        @include('payments.partials.qris-waiter', ['payment' => $pendingMedical, 'caption' => 'Medical checkup · '.$interview->organization->name])
+                                    </div>
+                                @elseif ($interview->hasPaidMedicalCheckup())
+                                    <div class="mt-2 rounded-2xl bg-emerald-50 p-4 text-emerald-900">Biaya medical checkup sudah dibayar. Menunggu hasil pemeriksaan dari perusahaan.</div>
+                                @else
+                                    <div class="mt-2 rounded-2xl bg-amber-50 p-4 text-amber-900 ring-1 ring-amber-200">
+                                        <div class="font-semibold">Selamat, Anda lolos wawancara!</div>
+                                        <p class="mt-1">Tahap akhir adalah medical checkup. Bayar biaya medical checkup Rp {{ number_format(config('careja.medical_checkup_fee'), 0, ',', '.') }} agar pemeriksaan dapat dijadwalkan.</p>
+                                        @if ($qrisAvailable)
+                                            <form method="POST" action="{{ route('worker.medical-payment.store', $interview) }}" class="mt-3">
+                                                @csrf
+                                                <x-primary-button>Bayar Medical Checkup via QRIS</x-primary-button>
+                                            </form>
+                                        @endif
+                                    </div>
+                                @endif
+                            @endif
                             @if ($interview->medical_status)
                                 <div class="mt-2 rounded-2xl p-4 {{ $interview->medical_status->value === 'fit' ? 'bg-emerald-50 text-emerald-900' : 'bg-red-50 text-red-900' }}">
                                     <div class="font-semibold">Medical checkup: {{ $interview->medical_status->label() }}</div>

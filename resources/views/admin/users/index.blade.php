@@ -9,6 +9,14 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-4">
             <x-flash />
 
+            @if ($temporaryPassword = session('temporaryPassword'))
+                <div class="rounded-2xl bg-blue-50 px-5 py-4 text-sm text-blue-900 ring-1 ring-blue-200">
+                    Password sementara untuk <strong>{{ $temporaryPassword['email'] }}</strong>:
+                    <code class="ms-1 rounded-lg bg-white px-2 py-1 font-mono text-base font-semibold tracking-wider ring-1 ring-blue-200">{{ $temporaryPassword['password'] }}</code>
+                    <div class="mt-1 text-xs text-blue-800">Hanya tampil sekali. Berikan ke pengguna dan minta segera menggantinya lewat menu Profil.</div>
+                </div>
+            @endif
+
             @unless ($twoFactorGloballyEnabled)
                 <div class="flex items-center gap-2 rounded-2xl bg-amber-50/90 px-5 py-3 text-sm text-amber-800 ring-1 ring-amber-200">
                     <span class="h-2 w-2 rounded-full bg-amber-500"></span>
@@ -69,6 +77,15 @@
                                 </td>
                                 <td class="px-6 py-4">
                                     <div class="flex justify-end gap-2">
+                                        @unless ($user->is(auth()->user()))
+                                            <form method="POST" action="{{ route('admin.users.password', $user) }}"
+                                                  onsubmit="return confirm('Reset password {{ $user->email }}? Password lama tidak berlaku lagi dan pengguna akan logout.')">
+                                                @csrf
+                                                @method('PATCH')
+                                                <x-secondary-button type="submit">Reset Password</x-secondary-button>
+                                            </form>
+                                        @endunless
+
                                         @unless ($user->isApproved())
                                             <form method="POST" action="{{ route('admin.users.approve', $user) }}">
                                                 @csrf

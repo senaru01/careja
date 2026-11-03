@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Enums\PaymentPurpose;
 use App\Enums\PaymentStatus;
 use App\Models\Payment;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -22,6 +23,18 @@ class PaymentReviewed extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         $message = (new MailMessage)->greeting('Halo '.$notifiable->name.',');
+
+        if ($this->payment->status === PaymentStatus::Verified && ! $this->payment->isMembership()) {
+            return $message
+                ->subject('Pembayaran '.$this->payment->purpose->label().' Berhasil')
+                ->line('Pembayaran '.$this->payment->purpose->label().' sebesar Rp '.number_format($this->payment->amount, 0, ',', '.').' telah kami terima.')
+                ->line(match ($this->payment->purpose) {
+                    PaymentPurpose::InterviewAccess => 'Anda sekarang dapat mengundang kandidat dari peringkat sesi tes untuk wawancara.',
+                    PaymentPurpose::MedicalCheckup => 'Perusahaan akan mencatat hasil medical checkup Anda setelah pemeriksaan.',
+                    default => 'Terima kasih telah menggunakan Careja.',
+                })
+                ->action('Buka Dashboard', route('dashboard'));
+        }
 
         if ($this->payment->status === PaymentStatus::Verified) {
             return $message

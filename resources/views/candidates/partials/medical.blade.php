@@ -24,6 +24,8 @@
                     <x-input-error class="sm:col-span-3" :messages="array_merge($errors->get('medical_status'), $errors->get('medical_notes'))" />
                     <p class="sm:col-span-3 text-xs text-slate-500">Hasil tidak dapat diubah. Jika tidak sehat, kursi kuota terbuka lagi dan Anda bisa memilih pengganti dari peringkat sesi tes.</p>
                 </form>
+            @elseif ($interview->awaitsMedicalPayment())
+                <p class="text-amber-700">Menunggu kandidat membayar biaya medical checkup. Hasil dapat dicatat setelah pembayaran diterima.</p>
             @else
                 <p class="text-slate-500">Menunggu hasil medical checkup dari perusahaan.</p>
             @endif

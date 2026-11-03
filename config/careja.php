@@ -33,6 +33,36 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Recruitment fees
+    |--------------------------------------------------------------------------
+    |
+    | `interview_fee` is paid by the company once per test session to invite
+    | candidates from its ranking to an interview (up to the quota).
+    | `medical_checkup_fee` is charged per candidate for the final medical
+    | checkup stage.
+    |
+    */
+
+    'interview_fee' => (int) env('INTERVIEW_FEE', 500000),
+
+    'medical_checkup_fee' => (int) env('MEDICAL_CHECKUP_FEE', 600000),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Payment demo
+    |--------------------------------------------------------------------------
+    |
+    | Secret part of the demo page URL (/demo-pembayaran/{key}) where payment
+    | gateway reviewers can pay every catalog item with a real QRIS charge
+    | without going through the recruitment flow. Demo payments never change
+    | anything else. Leave empty to switch the page off.
+    |
+    */
+
+    'payment_demo_key' => env('PAYMENT_DEMO_KEY'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Two-step verification
     |--------------------------------------------------------------------------
     |

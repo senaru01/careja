@@ -4,6 +4,8 @@ namespace Tests\Feature\Admin;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class UserApprovalTest extends TestCase
@@ -93,5 +95,56 @@ class UserApprovalTest extends TestCase
             ->assertSessionHasErrors('user');
 
         $this->assertModelExists($user);
+    }
+
+    public function test_super_admin_resets_a_users_password_to_a_temporary_one(): void
+    {
+        config(['session.driver' => 'database']);
+        $superAdmin = User::factory()->superAdmin()->create();
+        $user = User::factory()->create(['password' => 'password-lama']);
+        DB::table('sessions')->insert(['id' => 'old-session', 'user_id' => $user->id, 'payload' => '', 'last_activity' => now()->timestamp]);
+
+        $response = $this->actingAs($superAdmin)->patch(route('admin.users.password', $user));
+
+        $temporaryPassword = session('temporaryPassword');
+        $response->assertSessionHasNoErrors()->assertSessionHas('temporaryPassword.email', $user->email);
+        $this->assertSame(10, strlen($temporaryPassword['password']));
+        $this->assertTrue(Hash::check($temporaryPassword['password'], $user->fresh()->password));
+        $this->assertFalse(Hash::check('password-lama', $user->fresh()->password));
+        $this->assertDatabaseMissing('sessions', ['id' => 'old-session']);
+    }
+
+    public function test_temporary_password_is_shown_once_on_the_user_list(): void
+    {
+        $superAdmin = User::factory()->superAdmin()->create();
+        $user = User::factory()->create();
+
+        $this->actingAs($superAdmin)->patch(route('admin.users.password', $user));
+        $password = session('temporaryPassword')['password'];
+
+        $this->actingAs($superAdmin)->get(route('admin.users.index'))->assertSee($password);
+        $this->actingAs($superAdmin)->get(route('admin.users.index'))->assertDontSee($password);
+    }
+
+    public function test_super_admin_can_not_reset_their_own_password_here(): void
+    {
+        $superAdmin = User::factory()->superAdmin()->create(['password' => 'password-saya']);
+
+        $this->actingAs($superAdmin)
+            ->patch(route('admin.users.password', $superAdmin))
+            ->assertSessionHasErrors(['user' => 'Ubah password Anda sendiri lewat menu Profil.']);
+
+        $this->assertTrue(Hash::check('password-saya', $superAdmin->fresh()->password));
+    }
+
+    public function test_regular_users_can_not_reset_passwords(): void
+    {
+        $victim = User::factory()->create(['password' => 'password-asli']);
+
+        $this->actingAs(User::factory()->lpk()->create())
+            ->patch(route('admin.users.password', $victim))
+            ->assertForbidden();
+
+        $this->assertTrue(Hash::check('password-asli', $victim->fresh()->password));
     }
 }

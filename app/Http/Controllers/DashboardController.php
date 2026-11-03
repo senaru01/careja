@@ -4,13 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Enums\InterviewStatus;
 use App\Enums\MedicalStatus;
-use App\Enums\PaymentStatus;
 use App\Enums\UserRole;
 use App\Models\Exam;
 use App\Models\ExamAttempt;
 use App\Models\Organization;
 use App\Models\Payment;
 use App\Models\User;
+use App\Services\QrisPayments;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -55,6 +55,7 @@ class DashboardController extends Controller
             'isActiveCandidate' => $user->hasActiveMembership(),
             'activeMembership' => $user->activeMembership(),
             'membershipExpired' => $user->hasExpiredMembership(),
+            'qrisAvailable' => app(QrisPayments::class)->isAvailable(),
         ]);
     }
 
@@ -111,12 +112,12 @@ class DashboardController extends Controller
     {
         return view('dashboard.admin', [
             'stats' => [
-                'Pencari Kerja' => User::where('role', UserRole::Worker)->count(),
+                'Pencari Kerja' => User::where('role', UserRole::Worker)->where('email', '!=', PaymentDemoController::DEMO_EMAIL)->count(),
                 'Kandidat Aktif' => User::activeCandidates()->count(),
-                'Pembayaran Menunggu' => Payment::where('status', PaymentStatus::Pending)->count(),
-                'Total Pendapatan' => 'Rp '.number_format(Payment::where('status', PaymentStatus::Verified)->sum('amount'), 0, ',', '.'),
+                'Pembayaran Menunggu' => Payment::pending()->count(),
+                'Total Pendapatan' => 'Rp '.number_format(Payment::paid()->sum('amount'), 0, ',', '.'),
             ],
-            'pendingPayments' => Payment::with('user')->where('status', PaymentStatus::Pending)->oldest()->limit(10)->get(),
+            'pendingPayments' => Payment::with('user')->pending()->oldest()->limit(10)->get(),
             'organizations' => Organization::withCount('users')->get(),
         ]);
     }

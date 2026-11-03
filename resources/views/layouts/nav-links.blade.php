@@ -24,6 +24,7 @@
     }
 
     if ($user->isSuperAdmin()) {
+        $links[] = ['lpk.categories.index', 'lpk.categories.*', 'Bank Soal'];
         $links[] = ['admin.payments.index', 'admin.payments.*', 'Pembayaran'];
         $links[] = ['admin.organizations.index', 'admin.organizations.*', 'LPK & Perusahaan'];
         $links[] = ['admin.users.index', 'admin.users.*', 'Pengguna'];

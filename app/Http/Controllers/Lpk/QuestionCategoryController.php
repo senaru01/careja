@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Lpk;
 
+use App\Enums\OrganizationType;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Lpk\QuestionCategoryRequest;
+use App\Models\Organization;
 use App\Models\QuestionCategory;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -13,18 +15,32 @@ use Illuminate\View\View;
 class QuestionCategoryController extends Controller
 {
     /**
-     * Question bank overview: categories with their question counts.
+     * Question bank overview: categories with their question counts. The
+     * super admin sees the categories of every LPK.
      */
     public function index(Request $request): View
     {
+        $user = $request->user();
+
         return view('lpk.bank.index', [
-            'categories' => $request->user()->organization->questionCategories()->withCount('questions')->get(),
+            'categories' => QuestionCategory::query()
+                ->when(! $user->isSuperAdmin(), fn ($query) => $query->where('organization_id', $user->organization_id))
+                ->with('organization')
+                ->withCount('questions')
+                ->orderBy('organization_id')
+                ->orderBy('id')
+                ->get(),
+            'lpks' => $user->isSuperAdmin()
+                ? Organization::where('type', OrganizationType::Lpk)->orderBy('name')->pluck('name', 'id')
+                : collect(),
         ]);
     }
 
     public function store(QuestionCategoryRequest $request): RedirectResponse
     {
-        $category = $request->user()->organization->questionCategories()->create($request->validated());
+        $category = Organization::findOrFail($request->owningOrganizationId())
+            ->questionCategories()
+            ->create($request->safe()->only(['name', 'description']));
 
         return redirect()->route('lpk.categories.show', $category)->with('status', "Kategori \"{$category->name}\" dibuat.");
     }
@@ -59,7 +75,7 @@ class QuestionCategoryController extends Controller
 
     public function update(QuestionCategoryRequest $request, QuestionCategory $category): RedirectResponse
     {
-        $category->update($request->validated());
+        $category->update($request->safe()->only(['name', 'description']));
 
         return redirect()->route('lpk.categories.show', $category)->with('status', 'Kategori diperbarui.');
     }

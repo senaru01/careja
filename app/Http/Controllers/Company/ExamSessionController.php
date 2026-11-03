@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Company;
 
 use App\Http\Controllers\Controller;
 use App\Models\Exam;
+use App\Services\QrisPayments;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
@@ -29,9 +30,11 @@ class ExamSessionController extends Controller
     /**
      * Participants, final ranking and the selection for interviews.
      */
-    public function show(Exam $exam): View
+    public function show(Request $request, Exam $exam, QrisPayments $qris): View
     {
         Gate::authorize('follow', $exam);
+
+        $qris->syncPendingOf($request->user());
 
         $exam->load(['organization', 'reschedules'])->loadCount('participants');
 
@@ -46,6 +49,10 @@ class ExamSessionController extends Controller
             'openSeats' => $exam->openSeats(),
             'hired' => $exam->hiredCount(),
             'canSelect' => Gate::allows('select', $exam),
+            'interviewAccessPaid' => $exam->hasPaidInterviewAccess(),
+            'pendingInterviewPayment' => $exam->pendingInterviewAccessPayment(),
+            'qrisAvailable' => $qris->isAvailable(),
+            'interviewFee' => config('careja.interview_fee'),
         ]);
     }
 }

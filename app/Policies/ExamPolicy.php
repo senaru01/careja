@@ -88,9 +88,27 @@ class ExamPolicy
             return Response::deny();
         }
 
-        return $exam->hasEnded()
-            ? Response::allow()
-            : Response::deny('Pemilihan kandidat dibuka setelah sesi tes selesai dan peringkat final.');
+        return match (true) {
+            ! $exam->hasEnded() => Response::deny('Pemilihan kandidat dibuka setelah sesi tes selesai dan peringkat final.'),
+            ! $exam->hasPaidInterviewAccess() => Response::deny('Bayar biaya pengambilan kandidat wawancara terlebih dahulu.'),
+            default => Response::allow(),
+        };
+    }
+
+    /**
+     * The company pays the interview fee once per finished session.
+     */
+    public function payInterviewAccess(User $user, Exam $exam): Response
+    {
+        if (! $this->follow($user, $exam)) {
+            return Response::deny();
+        }
+
+        return match (true) {
+            ! $exam->hasEnded() => Response::deny('Biaya pengambilan kandidat dibayar setelah sesi tes selesai.'),
+            $exam->hasPaidInterviewAccess() => Response::deny('Biaya pengambilan kandidat untuk sesi ini sudah dibayar.'),
+            default => Response::allow(),
+        };
     }
 
     /**

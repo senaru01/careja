@@ -175,6 +175,27 @@ class Exam extends Model
     }
 
     /**
+     * Determine if the company paid the interview fee that unlocks inviting
+     * candidates from this session's ranking.
+     */
+    public function hasPaidInterviewAccess(): bool
+    {
+        return $this->payments()->where('purpose', PaymentPurpose::InterviewAccess)->paid()->exists();
+    }
+
+    /**
+     * The open QRIS payment for the interview fee, if the company started one.
+     */
+    public function pendingInterviewAccessPayment(): ?Payment
+    {
+        return $this->payments()
+            ->where('purpose', PaymentPurpose::InterviewAccess)
+            ->pending()
+            ->latest('id')
+            ->first();
+    }
+
+    /**
      * Determine if a participant registered before the schedule was last
      * postponed, which is the only case where leaving the session is allowed.
      */
