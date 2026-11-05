@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\PaymentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
-use App\Notifications\PaymentReviewed;
+use App\Services\ManualPayments;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -41,9 +41,10 @@ class PaymentController extends Controller
     }
 
     /**
-     * Verify or reject a pending payment.
+     * Verify or reject a pending payment. A verified payment takes effect
+     * right away (membership, session published, seat registered, interviews unlocked).
      */
-    public function update(Request $request, Payment $payment): RedirectResponse
+    public function update(Request $request, Payment $payment, ManualPayments $payments): RedirectResponse
     {
         if ($payment->status !== PaymentStatus::Pending) {
             return back()->withErrors(['payment' => 'Pembayaran ini sudah diproses.']);
@@ -58,8 +59,7 @@ class PaymentController extends Controller
             'note' => ['nullable', 'required_if:status,'.PaymentStatus::Rejected->value, 'string', 'max:500'],
         ], ['note.required_if' => 'Isi alasan penolakan.']);
 
-        $payment->markAs(PaymentStatus::from($validated['status']), $request->user(), $validated['note'] ?? null);
-        $payment->user->notify(new PaymentReviewed($payment));
+        $payments->review($payment, PaymentStatus::from($validated['status']), $request->user(), $validated['note'] ?? null);
 
         return back()->with('status', "Pembayaran {$payment->user->name} {$payment->status->label()}.");
     }

@@ -5,19 +5,10 @@ namespace App\Notifications;
 use App\Models\Exam;
 use App\Models\ExamReschedule;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
 
-class ExamRescheduled extends Notification
+class ExamRescheduled extends ActivityNotification
 {
     public function __construct(public Exam $exam, public ExamReschedule $reschedule) {}
-
-    /**
-     * @return array<int, string>
-     */
-    public function via(object $notifiable): array
-    {
-        return ['mail'];
-    }
 
     public function toMail(object $notifiable): MailMessage
     {

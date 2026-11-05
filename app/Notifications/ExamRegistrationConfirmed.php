@@ -4,19 +4,10 @@ namespace App\Notifications;
 
 use App\Models\ExamAttempt;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
 
-class ExamRegistrationConfirmed extends Notification
+class ExamRegistrationConfirmed extends ActivityNotification
 {
     public function __construct(public ExamAttempt $attempt) {}
-
-    /**
-     * @return array<int, string>
-     */
-    public function via(object $notifiable): array
-    {
-        return ['mail'];
-    }
 
     public function toMail(object $notifiable): MailMessage
     {

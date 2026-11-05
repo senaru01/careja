@@ -49,6 +49,21 @@ class CandidateProfile extends Model
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * WhatsApp chat link for the candidate's phone (08xx becomes 628xx), or
+     * null when no usable number is filled.
+     */
+    public function whatsappUrl(): ?string
+    {
+        $digits = preg_replace('/\D+/', '', (string) $this->phone);
+
+        if (strlen($digits) < 8) {
+            return null;
+        }
+
+        return 'https://wa.me/'.(str_starts_with($digits, '0') ? '62'.substr($digits, 1) : $digits);
+    }
+
     public function isComplete(): bool
     {
         foreach (self::REQUIRED_FIELDS as $field) {

@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers\Company;
 
+use App\Enums\PaymentPurpose;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\PaymentProofRequest;
 use App\Models\Exam;
+use App\Services\ManualPayments;
 use App\Services\QrisPayments;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -26,5 +29,23 @@ class InterviewPaymentController extends Controller
         }
 
         return redirect()->route('company.sessions.show', $exam);
+    }
+
+    /**
+     * Pay the interview fee by transfer and upload the proof. Inviting
+     * candidates unlocks once the admin verifies it.
+     */
+    public function manual(PaymentProofRequest $request, Exam $exam, ManualPayments $payments): RedirectResponse
+    {
+        Gate::authorize('payInterviewAccess', $exam);
+
+        if ($exam->pendingInterviewAccessPayment()) {
+            return back()->withErrors(['payment' => 'Pembayaran pengambilan kandidat sesi ini sedang diproses.']);
+        }
+
+        $payments->submit($request->user(), PaymentPurpose::InterviewAccess, $request->file('proof'), $exam);
+
+        return redirect()->route('company.sessions.show', $exam)
+            ->with('status', 'Bukti transfer terkirim. Undangan wawancara terbuka setelah admin memverifikasi pembayaran.');
     }
 }

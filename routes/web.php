@@ -8,8 +8,10 @@ use App\Http\Controllers\CandidatePhotoController;
 use App\Http\Controllers\Company\ExamSessionController as CompanyExamSessionController;
 use App\Http\Controllers\Company\InterviewController;
 use App\Http\Controllers\Company\InterviewPaymentController;
+use App\Http\Controllers\Company\RecruitmentRequestController as CompanyRecruitmentRequestController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\LiveScoreController;
 use App\Http\Controllers\Lpk\AttemptEvaluationController;
 use App\Http\Controllers\Lpk\BankQuestionController;
 use App\Http\Controllers\Lpk\BankQuestionImportController;
@@ -18,7 +20,9 @@ use App\Http\Controllers\Lpk\ExamController;
 use App\Http\Controllers\Lpk\ExamPublicationController;
 use App\Http\Controllers\Lpk\ExamQuestionController;
 use App\Http\Controllers\Lpk\ExamRescheduleController;
+use App\Http\Controllers\Lpk\ExamStartController;
 use App\Http\Controllers\Lpk\QuestionCategoryController;
+use App\Http\Controllers\Lpk\RecruitmentRequestController as LpkRecruitmentRequestController;
 use App\Http\Controllers\MidtransNotificationController;
 use App\Http\Controllers\PaymentDemoController;
 use App\Http\Controllers\PaymentStatusController;
@@ -95,6 +99,7 @@ Route::middleware('auth')->group(function () {
 
         Route::get('tes/{attempt}', [ExamAttemptController::class, 'show'])->name('attempts.show');
         Route::post('tes/{attempt}/mulai', [ExamAttemptController::class, 'start'])->name('attempts.start');
+        Route::post('tes/{attempt}/jawab', [ExamAttemptController::class, 'answer'])->middleware('throttle:240,1')->name('attempts.answer');
         Route::post('tes/{attempt}/kirim', [ExamAttemptController::class, 'submit'])->name('attempts.submit');
     });
 
@@ -104,6 +109,14 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:lpk,company,super_admin')->group(function () {
         Route::get('kandidat', [CandidateController::class, 'index'])->name('candidates.index');
         Route::get('kandidat/{candidate}', [CandidateController::class, 'show'])->name('candidates.show');
+    });
+
+    /*
+     * Live score board of a test session: the LPK running it and the company it recruits for.
+     */
+    Route::middleware('role:lpk,company')->group(function () {
+        Route::get('sesi-tes/{exam}/live', [LiveScoreController::class, 'show'])->name('sessions.live');
+        Route::get('sesi-tes/{exam}/live/data', [LiveScoreController::class, 'data'])->middleware('throttle:60,1')->name('sessions.live.data');
     });
 
     /*
@@ -118,6 +131,7 @@ Route::middleware('auth')->group(function () {
         Route::put('bank-soal/{category}', [QuestionCategoryController::class, 'update'])->name('categories.update');
         Route::delete('bank-soal/{category}', [QuestionCategoryController::class, 'destroy'])->name('categories.destroy');
         Route::post('bank-soal/{category}/import', [BankQuestionImportController::class, 'store'])->name('categories.import');
+        Route::get('bank-soal/{category}/export', [BankQuestionImportController::class, 'export'])->name('categories.export');
 
         Route::scopeBindings()->group(function () {
             Route::post('bank-soal/{category}/soal', [BankQuestionController::class, 'store'])->name('categories.questions.store');
@@ -139,7 +153,11 @@ Route::middleware('auth')->group(function () {
         Route::post('ujian/{exam}/ambil-bank-soal', [ExamBankQuestionController::class, 'store'])->name('exams.bank.store');
         Route::delete('ujian/{exam}/soal', [ExamBankQuestionController::class, 'destroy'])->name('exams.questions.clear');
         Route::post('ujian/{exam}/terbitkan', [ExamPublicationController::class, 'store'])->middleware('throttle:5,1')->name('exams.publish');
+        Route::post('ujian/{exam}/terbitkan/manual', [ExamPublicationController::class, 'manual'])->middleware('throttle:5,1')->name('exams.publish.manual');
         Route::post('ujian/{exam}/jadwal', [ExamRescheduleController::class, 'store'])->name('exams.reschedule');
+        Route::post('ujian/{exam}/mulai', [ExamStartController::class, 'store'])->name('exams.start');
+
+        Route::get('permintaan-rekrutmen', [LpkRecruitmentRequestController::class, 'index'])->name('recruitments.index');
 
         Route::put('hasil-tes/{attempt}/evaluasi', [AttemptEvaluationController::class, 'update'])->name('attempts.evaluate');
     });
@@ -151,9 +169,13 @@ Route::middleware('auth')->group(function () {
         Route::get('sesi-tes', [CompanyExamSessionController::class, 'index'])->name('sessions.index');
         Route::get('sesi-tes/{exam}', [CompanyExamSessionController::class, 'show'])->name('sessions.show');
         Route::post('sesi-tes/{exam}/bayar', [InterviewPaymentController::class, 'store'])->middleware('throttle:5,1')->name('sessions.payment.store');
+        Route::post('sesi-tes/{exam}/bayar/manual', [InterviewPaymentController::class, 'manual'])->middleware('throttle:5,1')->name('sessions.payment.manual');
         Route::post('sesi-tes/{exam}/undang', [InterviewController::class, 'store'])->name('interviews.store');
 
         Route::get('wawancara', [InterviewController::class, 'index'])->name('interviews.index');
+
+        Route::resource('rekrutmen', CompanyRecruitmentRequestController::class)->names('recruitments')->parameters(['rekrutmen' => 'recruitment']);
+        Route::patch('rekrutmen/{recruitment}/tutup', [CompanyRecruitmentRequestController::class, 'close'])->name('recruitments.close');
         Route::put('wawancara/{interview}', [InterviewController::class, 'update'])->name('interviews.update');
         Route::put('wawancara/{interview}/medical', [InterviewController::class, 'medical'])->name('interviews.medical');
     });

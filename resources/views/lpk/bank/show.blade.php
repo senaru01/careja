@@ -18,10 +18,19 @@
 
             {{-- Left: import & add --}}
             <div class="space-y-6">
-                <x-card title="Import dari Excel">
-                    <p class="text-sm text-slate-500">
-                        Gunakan <a href="{{ route('lpk.bank.template') }}" class="font-semibold text-blue-700 hover:underline">template Excel</a>.
-                        Kolom: Pertanyaan, Pilihan A–E, dan Jawaban (huruf A–E). Soal yang sama persis dengan yang sudah ada akan dilewati.
+                <x-card title="Export & Import Excel">
+                    <div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
+                        <div class="font-semibold text-slate-900">Koreksi & tinjau soal di Excel</div>
+                        <ol class="mt-1 list-decimal ms-4 space-y-0.5">
+                            <li>Export semua soal kategori ini.</li>
+                            <li>Perbaiki pertanyaan, pilihan, atau kunci jawaban di Excel. Kolom <strong>ID</strong> jangan diubah.</li>
+                            <li>Import kembali file tersebut: soal ber-ID diperbarui, baris tanpa ID ditambahkan sebagai soal baru.</li>
+                        </ol>
+                        <a href="{{ route('lpk.categories.export', $category) }}" class="mt-3 inline-block"><x-secondary-button>Export Excel ({{ $category->questions_count }} soal)</x-secondary-button></a>
+                    </div>
+                    <p class="mt-4 text-sm text-slate-500">
+                        Soal baru: gunakan <a href="{{ route('lpk.bank.template') }}" class="font-semibold text-blue-700 hover:underline">template Excel</a>.
+                        Kolom: Pertanyaan, Pilihan A–E, dan Jawaban (huruf A–E). Soal baru yang sama persis dengan yang sudah ada akan dilewati.
                     </p>
                     <form method="POST" action="{{ route('lpk.categories.import', $category) }}" enctype="multipart/form-data" class="mt-4 space-y-3">
                         @csrf
@@ -29,7 +38,7 @@
                                class="block w-full text-sm file:mr-3 file:rounded-full file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100">
                         @if ($errors->import->any())
                             <div class="rounded-2xl bg-red-50 p-3 text-xs text-red-700 ring-1 ring-red-200">
-                                <div class="font-semibold">Import dibatalkan, tidak ada soal yang disimpan:</div>
+                                <div class="font-semibold">Import dibatalkan, tidak ada soal yang disimpan atau diubah:</div>
                                 <ul class="mt-1 list-disc ms-4 space-y-0.5">
                                     @foreach ($errors->import->all() as $message)
                                         <li>{{ $message }}</li>

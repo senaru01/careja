@@ -4,19 +4,10 @@ namespace App\Notifications;
 
 use App\Models\Interview;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
 
-class InterviewScheduled extends Notification
+class InterviewScheduled extends ActivityNotification
 {
     public function __construct(public Interview $interview) {}
-
-    /**
-     * @return array<int, string>
-     */
-    public function via(object $notifiable): array
-    {
-        return ['mail'];
-    }
 
     public function toMail(object $notifiable): MailMessage
     {

@@ -3,14 +3,17 @@
 namespace App\Http\Controllers\Lpk;
 
 use App\Enums\OrganizationType;
+use App\Enums\PaymentPurpose;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Lpk\ExamRequest;
 use App\Models\Exam;
 use App\Models\Organization;
+use App\Models\RecruitmentRequest;
 use App\Services\QrisPayments;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
@@ -27,24 +30,47 @@ class ExamController extends Controller
         return view('lpk.exams.index', ['exams' => $exams]);
     }
 
-    public function create(): View
+    /**
+     * New session, optionally pre-filled from a company's recruitment
+     * request (?permintaan=id): company and position table are copied, the
+     * LPK adds the test details.
+     */
+    public function create(Request $request): View
     {
+        $recruitment = $request->filled('permintaan')
+            ? RecruitmentRequest::with(['company', 'positions'])->findOrFail($request->integer('permintaan'))
+            : null;
+
+        if ($recruitment) {
+            Gate::authorize('followUp', $recruitment);
+        }
+
         return view('lpk.exams.form', [
             'exam' => new Exam([
+                'company_id' => $recruitment?->company_id,
+                'recruitment_request_id' => $recruitment?->id,
+                'title' => $recruitment ? 'Tes '.$recruitment->title : null,
                 'duration_minutes' => 30,
                 'passing_score' => 70,
                 'starts_at' => now()->addWeek()->setTime(9, 0),
                 'ends_at' => now()->addWeek()->setTime(17, 0),
             ]),
+            'positions' => $recruitment?->positions ?? collect(),
+            'recruitment' => $recruitment,
             'companies' => $this->companies(),
         ]);
     }
 
     public function store(ExamRequest $request): RedirectResponse
     {
-        $exam = $request->user()->organization->exams()->make($request->validated());
-        $exam->created_by = $request->user()->id;
-        $exam->save();
+        $exam = DB::transaction(function () use ($request) {
+            $exam = $request->user()->organization->exams()->make($request->safe()->except('positions'));
+            $exam->created_by = $request->user()->id;
+            $exam->save();
+            $exam->syncPositions($request->positions());
+
+            return $exam;
+        });
 
         return redirect()->route('lpk.exams.show', $exam)
             ->with('status', 'Sesi tes dibuat sebagai draf. Tambahkan soal, lalu terbitkan.');
@@ -60,10 +86,10 @@ class ExamController extends Controller
         }
 
         $exam->load([
-            'company',
+            'company', 'positions', 'recruitmentRequest',
             'questions.options', 'questions.category',
             'reschedules.rescheduler',
-            'attempts' => fn ($query) => $query->with('user')->latest(),
+            'attempts' => fn ($query) => $query->with(['user', 'position'])->latest(),
         ]);
         $exam->attempts->each->setRelation('exam', $exam);
         $exam->attempts->each->finalizeIfExpired();
@@ -74,11 +100,13 @@ class ExamController extends Controller
             'exam' => $exam,
             'isLocked' => $exam->isLocked(),
             'pendingPayment' => $exam->pendingPublicationPayment(),
+            'rejectedPayment' => $exam->isPublished() ? null : $exam->latestRejectedPayment(PaymentPurpose::ExamSession),
             'qrisAvailable' => $qris->isAvailable(),
             'publishCheck' => Gate::inspect('publish', $exam),
             'fee' => config('careja.exam_session_fee'),
             'participants' => $exam->attempts->filter->isRegistered(),
-            'ranking' => $exam->hasEnded() ? $exam->ranking() : collect(),
+            'rankingGroups' => $exam->hasEnded() ? $exam->rankingGroups() : collect(),
+            'startCheck' => Gate::inspect('start', $exam),
             'categories' => $exam->organization->questionCategories()
                 ->withCount(['questions as available_count' => fn ($query) => $query->whereNotIn('id', $usedBankQuestionIds)])
                 ->get(),
@@ -90,14 +118,22 @@ class ExamController extends Controller
     {
         Gate::authorize('update', $exam);
 
-        return view('lpk.exams.form', ['exam' => $exam, 'companies' => $this->companies()]);
+        return view('lpk.exams.form', [
+            'exam' => $exam,
+            'positions' => $exam->positions,
+            'recruitment' => $exam->recruitmentRequest,
+            'companies' => $this->companies(),
+        ]);
     }
 
     public function update(ExamRequest $request, Exam $exam): RedirectResponse
     {
         Gate::authorize('update', $exam);
 
-        $exam->update($request->validated());
+        DB::transaction(function () use ($request, $exam) {
+            $exam->update($request->safe()->except('positions'));
+            $exam->syncPositions($request->positions());
+        });
 
         return redirect()->route('lpk.exams.show', $exam)->with('status', 'Sesi tes diperbarui.');
     }

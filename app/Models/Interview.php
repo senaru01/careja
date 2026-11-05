@@ -67,6 +67,16 @@ class Interview extends Model
     }
 
     /**
+     * The session position the candidate was picked for.
+     *
+     * @return BelongsTo<ExamPosition, $this>
+     */
+    public function position(): BelongsTo
+    {
+        return $this->belongsTo(ExamPosition::class, 'exam_position_id');
+    }
+
+    /**
      * @return BelongsTo<User, $this>
      */
     public function medicalChecker(): BelongsTo

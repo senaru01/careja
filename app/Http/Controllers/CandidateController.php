@@ -21,15 +21,22 @@ class CandidateController extends Controller
             'education_level' => ['nullable', 'string'],
             'skill' => ['nullable', 'string', 'max:100'],
             'theory' => ['nullable', 'in:passed,failed,none'],
+            'min_age' => ['nullable', 'integer', 'min:15', 'max:70'],
+            'max_age' => ['nullable', 'integer', 'min:15', 'max:70'],
+            'experience' => ['nullable', 'in:fresh,experienced'],
         ]);
 
         $candidates = User::activeCandidates()
-            ->with(['candidateProfile', 'skills', 'examAttempts' => fn ($query) => $query->whereNotNull('submitted_at')])
+            ->with(['candidateProfile', 'skills', 'workExperiences', 'examAttempts' => fn ($query) => $query->whereNotNull('submitted_at')])
             ->when($filters['search'] ?? null, fn (Builder $query, string $search) => $query->where(
                 fn (Builder $query) => $query->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%")
             ))
             ->when($filters['education_level'] ?? null, fn (Builder $query, string $level) => $query->whereRelation('candidateProfile', 'education_level', $level))
             ->when($filters['skill'] ?? null, fn (Builder $query, string $skill) => $query->whereRelation('skills', 'name', 'like', "%{$skill}%"))
+            ->when($filters['min_age'] ?? null, fn (Builder $query, int|string $age) => $query->whereRelation('candidateProfile', 'birth_date', '<=', now()->subYears((int) $age)->toDateString()))
+            ->when($filters['max_age'] ?? null, fn (Builder $query, int|string $age) => $query->whereRelation('candidateProfile', 'birth_date', '>', now()->subYears((int) $age + 1)->toDateString()))
+            ->when(($filters['experience'] ?? null) === 'experienced', fn (Builder $query) => $query->has('workExperiences'))
+            ->when(($filters['experience'] ?? null) === 'fresh', fn (Builder $query) => $query->doesntHave('workExperiences'))
             ->when(($filters['theory'] ?? null) === 'passed', fn (Builder $query) => $query->passedTheory())
             ->when(($filters['theory'] ?? null) === 'failed', fn (Builder $query) => $query
                 ->whereHas('examAttempts', fn (Builder $attempts) => $attempts->where('passed', false))

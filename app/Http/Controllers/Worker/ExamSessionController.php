@@ -5,8 +5,11 @@ namespace App\Http\Controllers\Worker;
 use App\Enums\PaymentPurpose;
 use App\Enums\PaymentStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\PaymentProofRequest;
 use App\Models\Exam;
+use App\Models\ExamPosition;
 use App\Services\ExamSessions;
+use App\Services\ManualPayments;
 use App\Services\QrisPayments;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -45,7 +48,8 @@ class ExamSessionController extends Controller
 
         $qris->syncPendingOf($user);
 
-        $exam->load(['organization', 'company', 'reschedules'])->loadCount('participants');
+        $exam->load(['organization', 'company', 'reschedules', 'positions'])->loadCount('participants');
+        $user->loadMissing(['candidateProfile', 'workExperiences']);
         $attempt = $exam->attempts()->where('user_id', $user->id)->first()?->setRelation('exam', $exam);
         $attempt?->finalizeIfExpired();
 
@@ -58,26 +62,47 @@ class ExamSessionController extends Controller
                 ->where('exam_id', $exam->id)
                 ->where('status', PaymentStatus::Pending)
                 ->first(),
+            'rejectedPayment' => $attempt?->isRegistered() ? null : $exam->latestRejectedPayment(PaymentPurpose::ExamRegistration, $user),
             'qrisAvailable' => $qris->isAvailable(),
             'tokens' => $user->availableExamTokens(),
             'fee' => config('careja.exam_registration_fee'),
-            'ranking' => $exam->hasEnded() ? $exam->ranking() : collect(),
+            'positionChecks' => $exam->positions->mapWithKeys(fn ($position) => [$position->id => $position->unmetRequirements($user)]),
+            'rankingGroups' => $exam->hasEnded() ? $exam->rankingGroups() : collect(),
             'interviews' => $exam->hasEnded() ? $exam->interviews()->get()->keyBy('user_id') : collect(),
         ]);
     }
 
     /**
-     * Register for the session: confirm the qualifications, then pay by QRIS or with a token.
+     * Register for the session: confirm the qualifications, then pay by QRIS,
+     * with a token, or by transfer with an uploaded proof (verified by the admin).
      */
-    public function store(Request $request, Exam $exam, ExamSessions $sessions, QrisPayments $qris): RedirectResponse
+    public function store(Request $request, Exam $exam, ExamSessions $sessions, QrisPayments $qris, ManualPayments $manualPayments): RedirectResponse
     {
         Gate::authorize('register', $exam);
 
         $user = $request->user();
         $validated = $request->validate([
+            'exam_position_id' => [
+                Rule::requiredIf(fn () => $exam->positions()->exists()),
+                'nullable',
+                'integer',
+                Rule::exists(ExamPosition::class, 'id')->where('exam_id', $exam->id),
+            ],
             'qualification_confirmed' => ['accepted'],
-            'pay_with' => ['required', Rule::in(['qris', 'token'])],
-        ], ['qualification_confirmed.accepted' => 'Centang pernyataan bahwa Anda memenuhi kualifikasi sesi ini.']);
+            'pay_with' => ['required', Rule::in(['qris', 'token', 'manual'])],
+            'proof' => ['exclude_unless:pay_with,manual', ...PaymentProofRequest::proofRules()],
+        ], [
+            'proof.required' => 'Pilih file bukti transfer terlebih dahulu.',
+            'exam_position_id.required' => 'Pilih posisi yang Anda lamar.',
+            'qualification_confirmed.accepted' => 'Centang pernyataan bahwa Anda memenuhi kualifikasi sesi ini.',
+        ]);
+
+        $position = isset($validated['exam_position_id']) ? $exam->positions()->find($validated['exam_position_id']) : null;
+        $unmet = $position?->unmetRequirements($user->load(['candidateProfile', 'workExperiences'])) ?? [];
+
+        if ($unmet !== []) {
+            return back()->withInput()->withErrors(['exam_position_id' => 'Anda belum memenuhi syarat posisi '.$position->position.': '.implode('; ', $unmet).'.']);
+        }
 
         $alreadyPaying = $user->payments()->where('exam_id', $exam->id)
             ->where('purpose', PaymentPurpose::ExamRegistration)->where('status', PaymentStatus::Pending)->exists();
@@ -86,7 +111,7 @@ class ExamSessionController extends Controller
             return redirect()->route('worker.sessions.show', $exam);
         }
 
-        $attempt = $sessions->prepareRegistration($user, $exam);
+        $attempt = $sessions->prepareRegistration($user, $exam, $position);
 
         if ($validated['pay_with'] === 'token') {
             if (! $sessions->registerWithToken($attempt)) {
@@ -95,6 +120,13 @@ class ExamSessionController extends Controller
 
             return redirect()->route('worker.sessions.show', $exam)
                 ->with('status', 'Terdaftar menggunakan 1 token. Sampai jumpa di hari tes!');
+        }
+
+        if ($validated['pay_with'] === 'manual') {
+            $manualPayments->submit($user, PaymentPurpose::ExamRegistration, $request->file('proof'), $exam);
+
+            return redirect()->route('worker.sessions.show', $exam)
+                ->with('status', 'Bukti transfer terkirim. Anda terdaftar otomatis setelah admin memverifikasi pembayaran.');
         }
 
         abort_unless($qris->isAvailable(), 503, 'Pembayaran QRIS otomatis belum tersedia.');

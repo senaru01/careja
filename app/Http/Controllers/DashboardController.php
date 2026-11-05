@@ -9,6 +9,7 @@ use App\Models\Exam;
 use App\Models\ExamAttempt;
 use App\Models\Organization;
 use App\Models\Payment;
+use App\Models\RecruitmentRequest;
 use App\Models\User;
 use App\Services\QrisPayments;
 use Illuminate\Http\Request;
@@ -80,6 +81,17 @@ class DashboardController extends Controller
                 ->orderBy('starts_at')
                 ->limit(5)
                 ->get(),
+            'openRequests' => RecruitmentRequest::open()
+                ->whereDoesntHave('exams')
+                ->with(['company', 'positions'])
+                ->latest()
+                ->limit(5)
+                ->get(),
+            'activeCandidates' => User::activeCandidates()
+                ->with(['candidateProfile', 'workExperiences', 'payments' => fn ($query) => $query->active()])
+                ->latest()
+                ->limit(8)
+                ->get(),
             'needsEvaluation' => (clone $attempts)->with(['user', 'exam'])
                 ->whereNotNull('submitted_at')->whereNull('evaluation')
                 ->latest('submitted_at')->limit(10)->get(),
@@ -103,6 +115,12 @@ class DashboardController extends Controller
             ],
             'sessions' => (clone $sessions)->with('organization')->withCount('participants')
                 ->latest('starts_at')->limit(6)->get(),
+            'recruitments' => RecruitmentRequest::where('company_id', $user->organization_id)
+                ->with('positions')
+                ->withCount('exams')
+                ->latest()
+                ->limit(5)
+                ->get(),
             'upcomingInterviews' => (clone $interviews)->with('user')
                 ->where('status', InterviewStatus::Scheduled)->orderBy('scheduled_at')->limit(10)->get(),
         ]);

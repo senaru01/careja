@@ -21,7 +21,7 @@ class InterviewController extends Controller
     public function index(Request $request): View
     {
         $interviews = $request->user()->organization->interviews()
-            ->with(['user', 'evaluator', 'exam'])
+            ->with(['user', 'evaluator', 'exam', 'position'])
             ->orderByRaw("case when status = 'scheduled' then 0 when status = 'passed' and medical_status is null then 1 else 2 end")
             ->orderBy('scheduled_at')
             ->paginate(20);
@@ -35,16 +35,18 @@ class InterviewController extends Controller
     public function store(StoreInterviewRequest $request, Exam $exam): RedirectResponse
     {
         $ranks = $request->ranking()->pluck('rank', 'user_id');
+        $position = $request->position();
         $skipped = $request->skippedRanks();
         $skipReason = $skipped->isNotEmpty()
             ? 'Melewati peringkat '.$skipped->implode(', ').': '.trim($request->validated('skip_reason'))
             : null;
 
-        $interviews = DB::transaction(fn () => collect($request->validated('user_ids'))->map(function ($userId) use ($request, $exam, $ranks, $skipReason) {
+        $interviews = DB::transaction(fn () => collect($request->validated('user_ids'))->map(function ($userId) use ($request, $exam, $ranks, $skipReason, $position) {
             $interview = $request->user()->organization->interviews()->make($request->safe()->only(['scheduled_at', 'location', 'notes']));
             $interview->forceFill([
                 'user_id' => (int) $userId,
                 'exam_id' => $exam->id,
+                'exam_position_id' => $position?->id,
                 'exam_rank' => $ranks[(int) $userId] ?? null,
                 'skip_reason' => $skipReason,
                 'scheduled_by' => $request->user()->id,

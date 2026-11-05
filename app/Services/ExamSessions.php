@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\PaymentPurpose;
 use App\Models\Exam;
 use App\Models\ExamAttempt;
+use App\Models\ExamPosition;
 use App\Models\ExamReschedule;
 use App\Models\ExamToken;
 use App\Models\Payment;
@@ -75,12 +76,17 @@ class ExamSessions
     }
 
     /**
-     * Start (or resume) a registration: the seat is held but not yet paid.
+     * Start (or resume) a registration for one of the session's positions:
+     * the seat is held but not yet paid.
      */
-    public function prepareRegistration(User $worker, Exam $exam): ExamAttempt
+    public function prepareRegistration(User $worker, Exam $exam, ?ExamPosition $position = null): ExamAttempt
     {
         $attempt = $exam->attempts()->where('user_id', $worker->id)->first() ?? $exam->attempts()->make();
-        $attempt->forceFill(['user_id' => $worker->id, 'qualification_confirmed_at' => now()])->save();
+        $attempt->forceFill([
+            'user_id' => $worker->id,
+            'exam_position_id' => $position?->id,
+            'qualification_confirmed_at' => now(),
+        ])->save();
 
         return $attempt;
     }

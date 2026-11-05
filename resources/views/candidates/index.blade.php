@@ -7,7 +7,7 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
             <x-flash />
 
-            <form method="GET" class="panel p-4 grid sm:grid-cols-5 gap-3 items-end">
+            <form method="GET" class="panel p-4 grid sm:grid-cols-4 lg:grid-cols-8 gap-3 items-end">
                 <div class="sm:col-span-2">
                     <x-input-label for="search" value="Cari nama / email" />
                     <x-text-input id="search" name="search" class="mt-1 block w-full" :value="$filters['search'] ?? ''" />
@@ -23,12 +23,26 @@
                     <x-text-input id="skill" name="skill" class="mt-1 block w-full" :value="$filters['skill'] ?? ''" />
                 </div>
                 <div>
+                    <x-input-label value="Umur (th)" />
+                    <div class="mt-1 flex items-center gap-1">
+                        <x-text-input name="min_age" type="number" min="15" max="70" class="block w-full" placeholder="min" :value="$filters['min_age'] ?? ''" />
+                        <span class="text-slate-400">–</span>
+                        <x-text-input name="max_age" type="number" min="15" max="70" class="block w-full" placeholder="maks" :value="$filters['max_age'] ?? ''" />
+                    </div>
+                </div>
+                <div>
+                    <x-input-label for="experience" value="Pengalaman" />
+                    <x-select id="experience" name="experience" class="mt-1 block w-full" placeholder="Semua"
+                        :options="['experienced' => 'Berpengalaman', 'fresh' => 'Fresh graduate']"
+                        :selected="$filters['experience'] ?? ''" />
+                </div>
+                <div>
                     <x-input-label for="theory" value="Tes Teori" />
                     <x-select id="theory" name="theory" class="mt-1 block w-full" placeholder="Semua"
                         :options="['passed' => 'Lulus', 'failed' => 'Tidak lulus', 'none' => 'Belum tes']"
                         :selected="$filters['theory'] ?? ''" />
                 </div>
-                <div class="sm:col-span-5 flex gap-2">
+                <div class="sm:col-span-4 lg:col-span-8 flex gap-2">
                     <x-primary-button>Filter</x-primary-button>
                     <a href="{{ route('candidates.index') }}"><x-secondary-button>Reset</x-secondary-button></a>
                 </div>
@@ -40,9 +54,12 @@
                         <thead class="text-left text-xs uppercase tracking-wide text-slate-400">
                             <tr>
                                 <th class="px-4 py-3">Kandidat</th>
+                                <th class="px-4 py-3">Umur</th>
                                 <th class="px-4 py-3">Pendidikan</th>
+                                <th class="px-4 py-3">Pengalaman</th>
                                 <th class="px-4 py-3">Skill</th>
                                 <th class="px-4 py-3">Domisili</th>
+                                <th class="px-4 py-3">Kontak</th>
                                 <th class="px-4 py-3">Tes Teori</th>
                                 <th class="px-4 py-3"></th>
                             </tr>
@@ -57,13 +74,23 @@
                                             <x-avatar :user="$candidate" />
                                             <div>
                                                 <div class="font-medium text-slate-900">{{ $candidate->name }}</div>
-                                                <div class="text-slate-500">{{ $profile?->gender?->label() }}{{ $profile?->birth_date ? ', '.$profile->birth_date->age.' th' : '' }}</div>
+                                                <div class="text-slate-500">{{ $profile?->gender?->label() }}</div>
                                             </div>
                                         </div>
                                     </td>
+                                    <td class="px-4 py-3 whitespace-nowrap">{{ $profile?->birth_date ? $profile->birth_date->age.' tahun' : '-' }}</td>
                                     <td class="px-4 py-3">{{ $profile?->education_level?->label() }} {{ $profile?->education_major }}</td>
+                                    <td class="px-4 py-3">
+                                        @if ($candidate->workExperiences->isEmpty())
+                                            <x-badge color="blue">Fresh graduate</x-badge>
+                                        @else
+                                            <div class="whitespace-nowrap font-medium text-slate-900">{{ $candidate->workExperienceLabel() }}</div>
+                                            <div class="text-xs text-slate-500">{{ implode(', ', $candidate->workFields()) }}</div>
+                                        @endif
+                                    </td>
                                     <td class="px-4 py-3">{{ $candidate->skills->pluck('name')->join(', ') ?: '-' }}</td>
                                     <td class="px-4 py-3">{{ $profile?->city }}</td>
+                                    <td class="px-4 py-3"><x-candidate-contact :candidate="$candidate" /></td>
                                     <td class="px-4 py-3">
                                         @if ($bestAttempt)
                                             <x-badge :color="$candidate->examAttempts->contains('passed', true) ? 'green' : 'red'">
@@ -78,7 +105,7 @@
                                     </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="6" class="px-4 py-8 text-center text-slate-500">Tidak ada kandidat.</td></tr>
+                                <tr><td colspan="9" class="px-4 py-8 text-center text-slate-500">Tidak ada kandidat.</td></tr>
                             @endforelse
                         </tbody>
                     </table>

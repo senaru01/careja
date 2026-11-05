@@ -25,8 +25,10 @@
 
             {{-- Publish: pay the session fee --}}
             @if (! $exam->isPublished())
-                @if ($pendingPayment)
+                @if ($pendingPayment?->isMidtrans())
                     @include('payments.partials.qris-waiter', ['payment' => $pendingPayment, 'caption' => 'Penerbitan sesi tes · terbit otomatis setelah dibayar'])
+                @elseif ($pendingPayment)
+                    @include('payments.partials.manual-waiter', ['payment' => $pendingPayment, 'caption' => 'Penerbitan sesi tes · terbit otomatis setelah diverifikasi'])
                 @else
                     <div class="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-blue-600 via-blue-800 to-blue-950 p-6 sm:p-8 text-white shadow-soft">
                         <x-batik.kawung class="text-white/[0.08]" size="40" />
@@ -46,10 +48,53 @@
                         @if ($publishCheck->denied())
                             <p class="relative mt-4 rounded-2xl bg-white/10 p-3 text-sm">{{ $publishCheck->message() }}</p>
                         @elseif (! $qrisAvailable)
-                            <p class="relative mt-4 rounded-2xl bg-white/10 p-3 text-sm">Pembayaran QRIS otomatis belum dikonfigurasi.</p>
+                            <p class="relative mt-4 rounded-2xl bg-white/10 p-3 text-sm">QRIS otomatis belum aktif. Bayar manual dan unggah bukti transfer di bawah.</p>
                         @endif
                     </div>
+                    @if ($rejectedPayment)
+                        <div class="rounded-2xl bg-red-50 p-4 text-sm text-red-700 ring-1 ring-red-200">
+                            Bukti transfer {{ $rejectedPayment->created_at->translatedFormat('d M Y H:i') }} ditolak admin: {{ $rejectedPayment->note }}. Silakan kirim bukti baru.
+                        </div>
+                    @endif
+                    @if ($publishCheck->allowed())
+                        @include('payments.partials.manual-proof-form', [
+                            'action' => route('lpk.exams.publish.manual', $exam),
+                            'amount' => $fee,
+                            'open' => ! $qrisAvailable,
+                            'note' => 'Sesi terbit otomatis setelah pembayaran diverifikasi.',
+                        ])
+                    @endif
                 @endif
+            @endif
+
+            {{-- Start the test in the room, follow it live --}}
+            @if ($exam->isWaitingForStart())
+                <div class="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-amber-500 via-amber-600 to-orange-700 p-6 sm:p-8 text-white shadow-soft">
+                    <x-batik.kawung class="text-white/[0.08]" size="40" />
+                    <div class="relative flex flex-wrap items-end justify-between gap-6">
+                        <div>
+                            <div class="text-sm text-amber-100">Pendaftaran ditutup · {{ $participants->count() }} peserta siap tes</div>
+                            <div class="mt-1 text-3xl font-extrabold tracking-tight">Mulai tes di ruangan</div>
+                            <div class="mt-1 text-sm text-amber-50">Tekan saat semua peserta sudah di ruangan. Semua peserta mendapat waktu {{ $exam->duration_minutes }} menit yang sama.</div>
+                        </div>
+                        <div class="flex flex-wrap gap-3">
+                            <a href="{{ route('sessions.live', $exam) }}" class="rounded-full bg-white/15 px-6 py-3.5 text-base font-semibold text-white ring-1 ring-white/40 transition hover:bg-white/25">Lihat Kehadiran</a>
+                            <form method="POST" action="{{ route('lpk.exams.start', $exam) }}" onsubmit="return confirm('Mulai tes sekarang untuk semua peserta? Waktu {{ $exam->duration_minutes }} menit langsung berjalan.')">
+                                @csrf
+                                <button type="submit" class="rounded-full bg-white px-7 py-3.5 text-base font-semibold text-amber-800 shadow-sm transition hover:bg-amber-50">Mulai Tes Sekarang</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            @elseif ($exam->isRunning())
+                <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">
+                    <span>Tes sedang berlangsung sejak {{ $exam->started_at->format('H:i') }}, berakhir {{ $exam->ends_at->format('H:i') }} WIB.</span>
+                    <a href="{{ route('sessions.live', $exam) }}"><x-primary-button type="button">Buka Live Score</x-primary-button></a>
+                </div>
+            @elseif ($exam->isOpenForRegistration())
+                <div class="rounded-2xl bg-blue-50 p-4 text-sm text-blue-900 ring-1 ring-blue-200">
+                    Tombol <strong>Mulai Tes</strong> muncul di sini pada jadwal {{ $exam->starts_at->translatedFormat('d M Y H:i') }} WIB, saat pendaftaran ditutup.
+                </div>
             @endif
 
             {{-- Postpone --}}
@@ -88,9 +133,12 @@
 
             {{-- Final ranking --}}
             @if ($exam->hasEnded())
-                <x-card title="Peringkat Final (Lulus)">
-                    <x-session-ranking :ranking="$ranking" :interviews="$exam->interviews()->get()->keyBy('user_id')" :quota="$exam->quota" />
-                </x-card>
+                @php($sessionInterviews = $exam->interviews()->get()->keyBy('user_id'))
+                @foreach ($rankingGroups as $group)
+                    <x-card :title="'Peringkat Final (Lulus)'.($group['position'] ? ' · '.$group['label'] : '')">
+                        <x-session-ranking :ranking="$group['ranking']" :interviews="$sessionInterviews->where('exam_position_id', $group['position']?->id)" :quota="$group['quota']" />
+                    </x-card>
+                @endforeach
             @endif
 
             <x-card title="Peserta">
@@ -100,12 +148,13 @@
                     <div class="overflow-x-auto">
                         <table class="min-w-full text-sm">
                             <thead class="text-left text-xs uppercase text-slate-500">
-                                <tr><th class="py-2">Peserta</th><th>Terdaftar</th><th>Status</th><th>Nilai</th><th>Benar</th><th>Evaluasi</th></tr>
+                                <tr><th class="py-2">Peserta</th><th>Posisi</th><th>Terdaftar</th><th>Status</th><th>Nilai</th><th>Benar</th><th>Evaluasi</th></tr>
                             </thead>
                             <tbody class="divide-y">
                                 @foreach ($participants as $attempt)
                                     <tr>
                                         <td class="py-2"><a class="text-blue-700 underline" href="{{ route('candidates.show', $attempt->user) }}">{{ $attempt->user->name }}</a></td>
+                                        <td>{{ $attempt->position?->position ?? '-' }}</td>
                                         <td class="text-slate-500">{{ $attempt->registered_at->format('d M H:i') }}</td>
                                         <td><x-badge :color="match (true) { $attempt->passed === true => 'green', $attempt->passed === false => 'red', $attempt->isAbsent() => 'gray', default => 'yellow' }">{{ $attempt->statusLabel() }}</x-badge></td>
                                         <td>{{ $attempt->score ?? '-' }}</td>

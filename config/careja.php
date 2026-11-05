@@ -4,6 +4,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Activity emails
+    |--------------------------------------------------------------------------
+    |
+    | Emails about activity in the system: payments, published or postponed
+    | sessions, registrations, interviews and recruitment requests. Off by
+    | default while accounts use dummy addresses, so bounced mail does not get
+    | the SMTP account flagged as spam. Login codes (OTP) are always sent.
+    |
+    */
+
+    'activity_emails' => (bool) env('ACTIVITY_EMAILS', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Registration fee
     |--------------------------------------------------------------------------
     |

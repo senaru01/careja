@@ -7,6 +7,7 @@ use App\Models\QuestionCategory;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Tests\TestCase;
@@ -126,6 +127,52 @@ class QuestionImportTest extends TestCase
         $this->actingAs($this->lpk)
             ->post(route('lpk.categories.import', $this->category), ['file' => UploadedFile::fake()->create('soal.pdf', 10, 'application/pdf')])
             ->assertSessionHasErrorsIn('import', 'file');
+    }
+
+    public function test_exported_file_can_be_corrected_and_imported_back(): void
+    {
+        $question = BankQuestion::factory()->for($this->category, 'category')->create(['question' => 'Ibu kota Jawa Tengah?']);
+        $question->syncOptions(['Semarang', 'Solo', 'Kudus'], 1);
+        $untouched = BankQuestion::factory()->for($this->category, 'category')->create(['question' => 'Satu tambah satu?']);
+        $untouched->syncOptions(['1', '2'], 1);
+
+        $response = $this->actingAs($this->lpk)->get(route('lpk.categories.export', $this->category));
+        $response->assertOk();
+        $path = tempnam(sys_get_temp_dir(), 'export').'.xlsx';
+        file_put_contents($path, $response->streamedContent());
+        $rows = IOFactory::load($path)->getActiveSheet()->toArray(null, true, false, false);
+
+        $this->assertSame(['Ibu kota Jawa Tengah?', 'Semarang', 'Solo', 'Kudus', '', '', 'B', $question->id], array_map(
+            fn ($value) => $value ?? '', $rows[1],
+        ));
+
+        // Fix the answer key of the first question and add a new one.
+        $rows[1][6] = 'A';
+        $rows[] = ['Soal baru?', 'Ya', 'Tidak', '', '', '', 'A', ''];
+
+        $this->post(route('lpk.categories.import', $this->category), ['file' => $this->xlsx($rows)])
+            ->assertSessionHas('status', '1 soal baru diimpor, 1 soal diperbarui di "Psikotes".');
+
+        $this->assertSame(3, $this->category->questions()->count());
+        $this->assertSame('Semarang', $question->options()->where('is_correct', true)->value('text'));
+    }
+
+    public function test_import_rejects_ids_from_outside_the_category(): void
+    {
+        $foreign = BankQuestion::factory()->withOptions()->create();
+
+        $this->actingAs($this->lpk)
+            ->post(route('lpk.categories.import', $this->category), ['file' => $this->xlsx([['Soal?', 'A', 'B', '', '', '', 'A', $foreign->id]])])
+            ->assertSessionHasErrorsIn('import', 'file');
+
+        $this->assertSame(0, $this->category->questions()->count());
+    }
+
+    public function test_lpk_can_not_export_another_lpks_category(): void
+    {
+        $this->actingAs($this->lpk)
+            ->get(route('lpk.categories.export', QuestionCategory::factory()->create()))
+            ->assertForbidden();
     }
 
     public function test_lpk_can_not_import_into_another_lpks_category(): void

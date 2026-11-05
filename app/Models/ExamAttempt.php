@@ -58,6 +58,16 @@ class ExamAttempt extends Model
     }
 
     /**
+     * The position the participant applied for.
+     *
+     * @return BelongsTo<ExamPosition, $this>
+     */
+    public function position(): BelongsTo
+    {
+        return $this->belongsTo(ExamPosition::class, 'exam_position_id');
+    }
+
+    /**
      * @return BelongsTo<User, $this>
      */
     public function evaluator(): BelongsTo
@@ -161,9 +171,30 @@ class ExamAttempt extends Model
     }
 
     /**
-     * Grade the given answers and lock the attempt. Answers sent after the
-     * deadline are ignored, so a late submission scores only what was on time
-     * (nothing).
+     * Determine if answers may still be saved: started, not submitted and
+     * within the deadline (plus the grace period).
+     */
+    public function acceptsAnswers(): bool
+    {
+        return $this->isStarted() && ! $this->isSubmitted() && ! $this->isPastDeadline();
+    }
+
+    /**
+     * Save one answer while the test runs, so progress survives a refresh
+     * and the live score board can follow it.
+     */
+    public function saveAnswer(ExamQuestion $question, ?ExamOption $option): void
+    {
+        $this->answers()->updateOrCreate(
+            ['exam_question_id' => $question->id],
+            ['exam_option_id' => $option?->id, 'is_correct' => (bool) $option?->is_correct],
+        );
+    }
+
+    /**
+     * Grade the answers and lock the attempt. Answers saved during the test
+     * count, the submitted ones replace them. Answers sent after the deadline
+     * are ignored, so a late submission scores only what was saved on time.
      *
      * @param  array<int|string, int|string|null>  $selectedOptions  question id => option id
      */
@@ -182,19 +213,19 @@ class ExamAttempt extends Model
                 return;
             }
 
+            $selectedOptions = array_replace(
+                $this->answers()->pluck('exam_option_id', 'exam_question_id')->all(),
+                array_filter($selectedOptions, fn ($optionId) => filled($optionId)),
+            );
+
             $questions = $this->exam->questions()->with('options')->get();
             $correctCount = 0;
 
             foreach ($questions as $question) {
                 $option = $question->options->firstWhere('id', (int) ($selectedOptions[$question->id] ?? 0));
-                $isCorrect = (bool) $option?->is_correct;
-                $correctCount += (int) $isCorrect;
+                $correctCount += (int) (bool) $option?->is_correct;
 
-                $this->answers()->create([
-                    'exam_question_id' => $question->id,
-                    'exam_option_id' => $option?->id,
-                    'is_correct' => $isCorrect,
-                ]);
+                $this->saveAnswer($question, $option);
             }
 
             $total = $questions->count();
@@ -253,6 +284,7 @@ class ExamAttempt extends Model
             $this->registered_at === null => 'Menunggu Pembayaran',
             $this->isStarted() => 'Sedang Dikerjakan',
             $this->isAbsent() => 'Tidak Hadir',
+            $this->exam->isWaitingForStart() => 'Menunggu Dimulai',
             default => 'Siap Tes',
         };
     }

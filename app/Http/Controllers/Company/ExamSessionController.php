@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Company;
 
+use App\Enums\PaymentPurpose;
 use App\Http\Controllers\Controller;
 use App\Models\Exam;
 use App\Services\QrisPayments;
@@ -36,7 +37,7 @@ class ExamSessionController extends Controller
 
         $qris->syncPendingOf($request->user());
 
-        $exam->load(['organization', 'reschedules'])->loadCount('participants');
+        $exam->load(['organization', 'reschedules', 'positions', 'recruitmentRequest'])->loadCount('participants');
 
         if ($exam->hasEnded()) {
             $exam->participants()->with('exam')->get()->each->finalizeIfExpired();
@@ -44,13 +45,14 @@ class ExamSessionController extends Controller
 
         return view('company.sessions.show', [
             'exam' => $exam,
-            'ranking' => $exam->hasEnded() ? $exam->ranking() : collect(),
-            'interviews' => $exam->interviews()->with('user')->get()->keyBy('user_id'),
+            'rankingGroups' => $exam->hasEnded() ? $exam->rankingGroups() : collect(),
+            'interviews' => $exam->interviews()->with(['user', 'position'])->get()->keyBy('user_id'),
             'openSeats' => $exam->openSeats(),
             'hired' => $exam->hiredCount(),
             'canSelect' => Gate::allows('select', $exam),
             'interviewAccessPaid' => $exam->hasPaidInterviewAccess(),
             'pendingInterviewPayment' => $exam->pendingInterviewAccessPayment(),
+            'rejectedInterviewPayment' => $exam->latestRejectedPayment(PaymentPurpose::InterviewAccess),
             'qrisAvailable' => $qris->isAvailable(),
             'interviewFee' => config('careja.interview_fee'),
         ]);

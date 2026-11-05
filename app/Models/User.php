@@ -104,6 +104,56 @@ class User extends Authenticatable
     }
 
     /**
+     * Total years of work experience (overlapping jobs counted once), with
+     * one decimal. A job without an end date runs until today.
+     */
+    public function workExperienceYears(): float
+    {
+        $experiences = $this->relationLoaded('workExperiences') ? $this->workExperiences : $this->workExperiences()->get();
+
+        $periods = $experiences
+            ->filter(fn (WorkExperience $experience) => $experience->start_date !== null)
+            ->map(fn (WorkExperience $experience) => [$experience->start_date, ($experience->end_date ?? now())->min(now())])
+            ->sortBy(fn (array $period) => $period[0]->timestamp)
+            ->values();
+
+        $days = 0;
+        $coveredUntil = null;
+
+        foreach ($periods as [$start, $end]) {
+            $start = $coveredUntil && $start->lessThan($coveredUntil) ? $coveredUntil : $start;
+            if ($end->greaterThan($start)) {
+                $days += $start->diffInDays($end);
+                $coveredUntil = $end;
+            }
+        }
+
+        return round($days / 365.25, 1);
+    }
+
+    /**
+     * Experience as shown to people, e.g. "2,5 tahun" or "belum ada pengalaman".
+     */
+    public function workExperienceLabel(): string
+    {
+        $years = $this->workExperienceYears();
+
+        return $years > 0 ? str_replace('.', ',', (string) $years).' tahun' : 'belum ada pengalaman';
+    }
+
+    /**
+     * The fields the candidate worked in (job titles), most recent first.
+     *
+     * @return list<string>
+     */
+    public function workFields(): array
+    {
+        $experiences = $this->relationLoaded('workExperiences') ? $this->workExperiences : $this->workExperiences()->get();
+
+        return $experiences->pluck('position')->filter()->map(fn (string $position) => trim($position))->unique()->values()->all();
+    }
+
+    /**
      * @return HasMany<CandidateDocument, $this>
      */
     public function documents(): HasMany

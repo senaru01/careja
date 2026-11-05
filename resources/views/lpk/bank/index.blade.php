@@ -38,6 +38,7 @@
 
                         <div class="flex flex-wrap items-center gap-3">
                             <a href="{{ route('lpk.categories.show', $category) }}"><x-primary-button type="button">Kelola Soal</x-primary-button></a>
+                            <a href="{{ route('lpk.categories.export', $category) }}" class="text-sm font-semibold text-slate-600 hover:text-blue-700">Export Excel</a>
                             <a href="{{ route('lpk.categories.edit', $category) }}" class="text-sm font-semibold text-slate-600 hover:text-blue-700">Ubah</a>
                             <form method="POST" action="{{ route('lpk.categories.destroy', $category) }}"
                                   onsubmit="return confirm('Hapus kategori {{ $category->name }} beserta {{ $category->questions_count }} soalnya? Ujian yang sudah dibuat tidak terpengaruh.')">

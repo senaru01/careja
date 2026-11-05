@@ -33,9 +33,12 @@ class ExamFlowTest extends TestCase
         return [
             'title' => 'Tes Dasar Pengelasan',
             'company_id' => $company->id,
-            'position' => 'Juru Las SMAW',
-            'qualifications' => 'SMK Teknik Las, sertifikat BNSP diutamakan.',
-            'quota' => 10,
+            'positions' => [
+                ['position' => 'Juru Las SMAW', 'quota' => 7, 'min_education' => 'smk', 'min_age' => 18, 'max_age' => 30, 'min_experience_years' => 0],
+                ['position' => 'Staff QC', 'quota' => 3, 'min_education' => 'd3', 'min_age' => '', 'max_age' => '', 'min_experience_years' => 2],
+                ['position' => '', 'quota' => '', 'min_education' => '', 'min_age' => '', 'max_age' => '', 'min_experience_years' => 0],
+            ],
+            'qualifications' => 'Sertifikat BNSP diutamakan.',
             'min_participants' => 20,
             'duration_minutes' => 30,
             'passing_score' => 70,
@@ -49,8 +52,11 @@ class ExamFlowTest extends TestCase
         $lpk = User::factory()->lpk()->create();
         $company = Organization::factory()->company()->create();
 
+        $this->actingAs($lpk)->get(route('lpk.exams.create'))->assertOk();
         $this->actingAs($lpk)->post(route('lpk.exams.store'), $this->sessionData($company))->assertSessionHasNoErrors();
         $exam = Exam::firstOrFail();
+        $this->actingAs($lpk)->get(route('lpk.exams.edit', $exam))->assertOk()->assertSee('Staff QC');
+        $this->actingAs($lpk)->get(route('lpk.exams.show', $exam))->assertOk()->assertSee('Pengalaman min. 2 tahun');
 
         $this->actingAs($lpk)->post(route('lpk.exams.questions.store', $exam), [
             'question' => 'Alat pelindung mata saat mengelas?',
@@ -61,6 +67,9 @@ class ExamFlowTest extends TestCase
         $this->assertTrue($exam->organization->is($lpk->organization));
         $this->assertTrue($exam->company->is($company));
         $this->assertSame(10, $exam->quota);
+        $this->assertSame('Juru Las SMAW, Staff QC', $exam->position);
+        $this->assertSame([7, 3], $exam->positions->pluck('quota')->all());
+        $this->assertSame(2, $exam->positions[1]->min_experience_years);
         $this->assertFalse($exam->isPublished());
         $question = $exam->questions()->with('options')->firstOrFail();
         $this->assertCount(2, $question->options);

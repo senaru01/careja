@@ -33,7 +33,20 @@ class ExamFactory extends Factory
             'starts_at' => now()->subHour(),
             'ends_at' => now()->addDay(),
             'published_at' => now()->subDays(3),
+            'started_at' => now()->subHour(),
         ];
+    }
+
+    /**
+     * Registration closed, participants wait for the LPK to start the test.
+     */
+    public function waitingForStart(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'starts_at' => now()->subMinutes(10),
+            'ends_at' => now()->addHours(8),
+            'started_at' => null,
+        ]);
     }
 
     /**
@@ -43,6 +56,7 @@ class ExamFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'published_at' => null,
+            'started_at' => null,
             'starts_at' => now()->addWeek(),
             'ends_at' => now()->addWeek()->addHours(8),
         ]);
@@ -56,6 +70,7 @@ class ExamFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'starts_at' => now()->addDays(2),
             'ends_at' => now()->addDays(2)->addHours(8),
+            'started_at' => null,
         ]);
     }
 
@@ -67,6 +82,7 @@ class ExamFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'starts_at' => now()->subDays(2),
             'ends_at' => now()->subDay(),
+            'started_at' => now()->subDays(2),
         ]);
     }
 

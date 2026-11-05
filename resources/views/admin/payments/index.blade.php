@@ -51,8 +51,8 @@
                                     @endif
                                 </td>
                                 <td class="px-4 py-3">
-                                    <x-badge :color="match ($payment->status->value) { 'verified' => $payment->isActive() ? 'green' : 'gray', 'rejected', 'expired' => 'red', default => 'yellow' }">
-                                        @if ($payment->status->value === 'verified' && ! $payment->isActive())
+                                    <x-badge :color="match ($payment->status->value) { 'verified' => $payment->isActive() || ! $payment->isMembership() ? 'green' : 'gray', 'rejected', 'expired' => 'red', default => 'yellow' }">
+                                        @if ($payment->status->value === 'verified' && $payment->isMembership() && ! $payment->isActive())
                                             Masa aktif habis
                                         @elseif ($payment->isPending() && $payment->isMidtrans())
                                             Menunggu Pembayaran
@@ -76,6 +76,15 @@
                                         <span class="text-xs text-slate-500">Menunggu konfirmasi otomatis dari Midtrans</span>
                                     @elseif ($payment->isPending())
                                         <div class="flex flex-col gap-2">
+                                            <div class="text-xs text-slate-500">
+                                                Verifikasi = {{ match ($payment->purpose->value) {
+                                                    'exam_session' => 'sesi tes langsung terbit',
+                                                    'exam_registration' => 'peserta langsung terdaftar',
+                                                    'interview_access' => 'perusahaan bisa mengundang wawancara',
+                                                    'medical_checkup' => 'medical checkup tercatat lunas',
+                                                    default => 'keanggotaan aktif',
+                                                } }}
+                                            </div>
                                             <form method="POST" action="{{ route('admin.payments.update', $payment) }}">
                                                 @csrf @method('PATCH')
                                                 <input type="hidden" name="status" value="verified">

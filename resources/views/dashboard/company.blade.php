@@ -20,6 +20,26 @@
                 </div>
             </div>
 
+            <x-card title="Rekrutmen Karyawan">
+                <x-slot name="actions">
+                    <div class="flex items-center gap-3">
+                        <a class="text-sm font-semibold text-blue-700 hover:underline" href="{{ route('company.recruitments.index') }}">Semua permintaan</a>
+                        <a href="{{ route('company.recruitments.create') }}"><x-primary-button type="button">Buat Permintaan</x-primary-button></a>
+                    </div>
+                </x-slot>
+                @forelse ($recruitments as $recruitment)
+                    <div class="py-3 {{ $loop->first ? 'pt-0' : 'border-t border-slate-100' }} flex flex-wrap items-center justify-between gap-3 text-sm">
+                        <div>
+                            <a class="font-semibold text-blue-700 hover:underline" href="{{ route('company.recruitments.show', $recruitment) }}">{{ $recruitment->title }}</a>
+                            <div class="text-slate-500">{{ $recruitment->positions->map(fn ($position) => $position->position.' '.$position->quota.' org')->join(', ') }}</div>
+                        </div>
+                        <x-badge :color="$recruitment->statusColor()">{{ $recruitment->statusLabel() }}</x-badge>
+                    </div>
+                @empty
+                    <p class="text-sm text-slate-500">Belum ada permintaan. Rilis kebutuhan karyawan Anda (posisi, jumlah, pendidikan, umur, pengalaman) dan LPK akan menindaklanjuti dengan sesi tes.</p>
+                @endforelse
+            </x-card>
+
             <div class="grid lg:grid-cols-2 gap-6">
                 <x-card title="Sesi Tes Perusahaan Anda">
                     <x-slot name="actions">
@@ -38,7 +58,7 @@
                             </div>
                         </div>
                     @empty
-                        <p class="text-sm text-slate-500">Belum ada sesi tes untuk perusahaan Anda. LPK akan membuat sesi sesuai kebutuhan Anda.</p>
+                        <p class="text-sm text-slate-500">Belum ada sesi tes untuk perusahaan Anda. Buat permintaan rekrutmen, LPK akan membuat sesi sesuai kebutuhan Anda.</p>
                     @endforelse
                 </x-card>
 

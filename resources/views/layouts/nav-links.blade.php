@@ -14,11 +14,13 @@
     }
 
     if ($user->isLpk()) {
+        $links[] = ['lpk.recruitments.index', 'lpk.recruitments.*', 'Permintaan PT'];
         $links[] = ['lpk.categories.index', 'lpk.categories.*', 'Bank Soal'];
         $links[] = ['lpk.exams.index', 'lpk.exams.*', 'Sesi Tes'];
     }
 
     if ($user->isCompany()) {
+        $links[] = ['company.recruitments.index', 'company.recruitments.*', 'Rekrutmen'];
         $links[] = ['company.sessions.index', 'company.sessions.*', 'Sesi Tes'];
         $links[] = ['company.interviews.index', 'company.interviews.*', 'Wawancara & Medical'];
     }

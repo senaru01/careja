@@ -4,7 +4,7 @@
     </x-slot>
 
     <div class="py-8">
-        <div class="max-w-3xl mx-auto sm:px-6 lg:px-8 space-y-6">
+        <div class="max-w-5xl mx-auto sm:px-6 lg:px-8 space-y-6">
             <div class="rounded-2xl bg-blue-50 p-4 text-sm text-blue-900 ring-1 ring-blue-200">
                 Semua yang diisi di sini diumumkan ke pencari kerja dan <strong>dikunci setelah sesi diterbitkan</strong>,
                 supaya hanya yang memenuhi kualifikasi yang membayar dan ikut tes. Setelah terbit, jadwal hanya bisa dimundurkan.
@@ -16,38 +16,46 @@
                     @if ($exam->exists) @method('PUT') @endif
 
                     <div class="text-sm font-semibold uppercase tracking-wide text-slate-400">Kebutuhan perusahaan</div>
-                    <div class="grid sm:grid-cols-2 gap-4">
-                        <div>
+                    @if ($recruitment)
+                        <input type="hidden" name="recruitment_request_id" value="{{ $recruitment->id }}">
+                        <input type="hidden" name="company_id" value="{{ $recruitment->company_id }}">
+                        <div class="rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-900 ring-1 ring-emerald-200">
+                            Dari permintaan rekrutmen <strong>{{ $recruitment->company->name }}</strong>: "{{ $recruitment->title }}"
+                            @if ($recruitment->needed_by) · target mulai kerja {{ $recruitment->needed_by->translatedFormat('d M Y') }} @endif
+                            @if ($recruitment->description)
+                                <p class="mt-1 whitespace-pre-line text-emerald-800">{{ $recruitment->description }}</p>
+                            @endif
+                            <p class="mt-1 text-xs text-emerald-700">Tabel posisi di bawah disalin dari permintaan perusahaan. Anda masih bisa menyesuaikannya sebelum sesi diterbitkan.</p>
+                        </div>
+                        <x-input-error :messages="$errors->get('company_id')" class="mt-1" />
+                        <x-input-error :messages="$errors->get('recruitment_request_id')" class="mt-1" />
+                    @else
+                        <div class="sm:w-1/2">
                             <x-input-label for="company_id" value="Perusahaan" />
                             <x-select id="company_id" name="company_id" class="mt-1 block w-full" placeholder="Pilih perusahaan" required
                                 :options="$companies" :selected="old('company_id', $exam->company_id)" />
                             <x-input-error :messages="$errors->get('company_id')" class="mt-1" />
                         </div>
-                        <div>
-                            <x-input-label for="position" value="Posisi / keahlian yang dibutuhkan" />
-                            <x-text-input id="position" name="position" class="mt-1 block w-full" placeholder="mis. Operator Las (Welder)" :value="old('position', $exam->position)" required />
-                            <x-input-error :messages="$errors->get('position')" class="mt-1" />
-                        </div>
-                    </div>
+                    @endif
+
                     <div>
-                        <x-input-label for="qualifications" value="Kualifikasi peserta" />
-                        <x-textarea id="qualifications" name="qualifications" class="mt-1 block w-full" rows="4" required
-                            placeholder="mis. Pria/Wanita 18-30 tahun, min. SMK Teknik Mesin/Las, bisa las SMAW, sehat jasmani">{{ old('qualifications', $exam->qualifications) }}</x-textarea>
+                        <x-input-label value="Posisi yang dibutuhkan" />
+                        <p class="mb-2 text-xs text-slate-500">Satu baris per posisi. Pencari kerja memilih satu posisi saat mendaftar dan sistem memeriksa pendidikan, umur, dan pengalamannya. Peringkat dan kuota dihitung per posisi.</p>
+                        <x-position-table-input :positions="$positions" />
+                    </div>
+
+                    <div>
+                        <x-input-label for="qualifications" value="Kualifikasi tambahan (opsional)" />
+                        <x-textarea id="qualifications" name="qualifications" class="mt-1 block w-full" rows="3"
+                            placeholder="mis. sehat jasmani, tidak buta warna, bersedia kerja shift">{{ old('qualifications', $exam->qualifications) }}</x-textarea>
                         <x-input-error :messages="$errors->get('qualifications')" class="mt-1" />
                         <p class="mt-1 text-xs text-slate-500">Pencari kerja wajib menyatakan memenuhi kualifikasi ini sebelum membayar.</p>
                     </div>
-                    <div class="grid sm:grid-cols-2 gap-4">
-                        <div>
-                            <x-input-label for="quota" value="Jumlah dibutuhkan (orang)" />
-                            <x-text-input id="quota" type="number" min="1" max="1000" name="quota" class="mt-1 block w-full" :value="old('quota', $exam->quota)" required />
-                            <x-input-error :messages="$errors->get('quota')" class="mt-1" />
-                        </div>
-                        <div>
-                            <x-input-label for="min_participants" value="Target minimal peserta (opsional)" />
-                            <x-text-input id="min_participants" type="number" min="1" name="min_participants" class="mt-1 block w-full" :value="old('min_participants', $exam->min_participants)" />
-                            <x-input-error :messages="$errors->get('min_participants')" class="mt-1" />
-                            <p class="mt-1 text-xs text-slate-500">Jika peserta kurang dari target, Anda bisa memundurkan jadwal.</p>
-                        </div>
+                    <div class="sm:w-1/2">
+                        <x-input-label for="min_participants" value="Target minimal peserta (opsional)" />
+                        <x-text-input id="min_participants" type="number" min="1" name="min_participants" class="mt-1 block w-full" :value="old('min_participants', $exam->min_participants)" />
+                        <x-input-error :messages="$errors->get('min_participants')" class="mt-1" />
+                        <p class="mt-1 text-xs text-slate-500">Jika peserta kurang dari target, Anda bisa memundurkan jadwal.</p>
                     </div>
 
                     <div class="pt-2 text-sm font-semibold uppercase tracking-wide text-slate-400">Tes</div>
@@ -85,7 +93,7 @@
                             <x-input-error :messages="$errors->get('ends_at')" class="mt-1" />
                         </div>
                     </div>
-                    <p class="text-xs text-slate-500">Pendaftaran ditutup saat tes dibuka. Peringkat final keluar setelah tes ditutup.</p>
+                    <p class="text-xs text-slate-500">Pendaftaran ditutup saat jadwal mulai. Tes dikerjakan bersama di satu ruangan: LPK menekan tombol <strong>Mulai Tes</strong> dan semua peserta mendapat waktu {{ $exam->duration_minutes ?? 'sesuai durasi' }} menit yang sama. Peringkat final keluar setelah waktu habis.</p>
 
                     <div class="flex gap-3">
                         <x-primary-button>Simpan Draf</x-primary-button>

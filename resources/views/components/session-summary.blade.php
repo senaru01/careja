@@ -1,7 +1,10 @@
 {{-- Everything announced for a test session, so participants know exactly what they apply for. --}}
 @props(['exam'])
 
-@php($phase = $exam->phase())
+@php
+    $phase = $exam->phase();
+    $positions = $exam->relationLoaded('positions') ? $exam->positions : $exam->positions()->get();
+@endphp
 
 <div {{ $attributes->merge(['class' => 'panel relative overflow-hidden p-6']) }}>
     <x-batik.kawung class="text-blue-600/[0.04]" size="36" />
@@ -37,16 +40,26 @@
             </div>
         </div>
 
+        @if ($positions->isNotEmpty())
+            <x-position-table :positions="$positions" />
+        @endif
+
         <div class="grid sm:grid-cols-2 gap-4 text-sm">
             <div>
-                <div class="font-semibold text-slate-900">Kualifikasi</div>
-                <p class="mt-1 text-slate-700 whitespace-pre-line">{{ $exam->qualifications ?? '-' }}</p>
+                <div class="font-semibold text-slate-900">{{ $positions->isNotEmpty() ? 'Kualifikasi tambahan' : 'Kualifikasi' }}</div>
+                <p class="mt-1 text-slate-700 whitespace-pre-line">{{ $exam->qualifications ?: '-' }}</p>
+                @if ($exam->recruitmentRequest)
+                    <p class="mt-2 text-xs text-emerald-700">Sesi ini menindaklanjuti permintaan rekrutmen {{ $exam->company?->name }}: "{{ $exam->recruitmentRequest->title }}".</p>
+                @endif
             </div>
             <div>
                 <div class="font-semibold text-slate-900">Jadwal tes</div>
                 @if ($exam->starts_at)
                     <p class="mt-1 text-slate-700">{{ $exam->starts_at->translatedFormat('l, d M Y H:i') }} – {{ $exam->ends_at?->translatedFormat('d M Y H:i') }} WIB</p>
-                    <p class="text-xs text-slate-500">Tes bisa dimulai kapan saja dalam rentang ini; waktu {{ $exam->duration_minutes }} menit berjalan sejak tombol Mulai ditekan.</p>
+                    <p class="text-xs text-slate-500">Tes dikerjakan bersama di satu ruangan. Pengawas LPK memulai tes, lalu semua peserta mendapat waktu {{ $exam->duration_minutes }} menit yang sama.</p>
+                    @if ($exam->started_at)
+                        <p class="mt-1 text-xs font-semibold text-slate-700">Dimulai {{ $exam->started_at->translatedFormat('d M Y H:i') }}, berakhir {{ $exam->ends_at?->translatedFormat('H:i') }} WIB.</p>
+                    @endif
                 @else
                     <p class="mt-1 text-slate-500">Belum dijadwalkan</p>
                 @endif

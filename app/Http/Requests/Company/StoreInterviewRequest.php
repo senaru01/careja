@@ -4,15 +4,18 @@ namespace App\Http\Requests\Company;
 
 use App\Models\Exam;
 use App\Models\ExamAttempt;
+use App\Models\ExamPosition;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 /**
- * Invite candidates from a finished test session's ranking. Only passed
- * participants can be picked, never more than the open seats, and passing
- * over a better ranked candidate requires a written (public) reason.
+ * Invite candidates from a finished test session's ranking (of one position
+ * when the session has a position table). Only passed participants can be
+ * picked, never more than the open seats, and passing over a better ranked
+ * candidate requires a written (public) reason.
  */
 class StoreInterviewRequest extends FormRequest
 {
@@ -32,6 +35,12 @@ class StoreInterviewRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'exam_position_id' => [
+                Rule::requiredIf(fn () => $this->exam()->positions()->exists()),
+                'nullable',
+                'integer',
+                Rule::exists(ExamPosition::class, 'id')->where('exam_id', $this->exam()->id),
+            ],
             'user_ids' => ['required', 'array', 'min:1'],
             'user_ids.*' => ['integer', 'distinct'],
             'scheduled_at' => ['required', 'date', 'after:now'],
@@ -53,12 +62,16 @@ class StoreInterviewRequest extends FormRequest
                 }
 
                 $exam = $this->exam();
+                $position = $this->position();
                 $selected = collect($this->input('user_ids'))->map(fn ($id) => (int) $id);
                 $ranking = $this->ranking();
                 $invited = $exam->interviews()->pluck('user_id');
+                $openSeats = $exam->openSeats($position);
 
                 if ($selected->diff($ranking->pluck('user_id'))->isNotEmpty()) {
-                    $validator->errors()->add('user_ids', 'Hanya peserta yang lulus tes sesi ini yang dapat diundang.');
+                    $validator->errors()->add('user_ids', $position
+                        ? 'Hanya peserta yang lulus tes untuk posisi '.$position->position.' yang dapat diundang.'
+                        : 'Hanya peserta yang lulus tes sesi ini yang dapat diundang.');
 
                     return;
                 }
@@ -69,8 +82,8 @@ class StoreInterviewRequest extends FormRequest
                     return;
                 }
 
-                if ($selected->count() > $exam->openSeats()) {
-                    $validator->errors()->add('user_ids', "Sisa kuota hanya {$exam->openSeats()} orang.");
+                if ($selected->count() > $openSeats) {
+                    $validator->errors()->add('user_ids', "Sisa kuota hanya {$openSeats} orang.");
 
                     return;
                 }
@@ -89,11 +102,21 @@ class StoreInterviewRequest extends FormRequest
     }
 
     /**
+     * The position the candidates are picked for, if the session has positions.
+     */
+    public function position(): ?ExamPosition
+    {
+        $id = $this->input('exam_position_id');
+
+        return $id ? $this->exam()->positions()->find($id) : null;
+    }
+
+    /**
      * @return Collection<int, ExamAttempt>
      */
     public function ranking(): Collection
     {
-        return $this->ranking ??= $this->exam()->ranking();
+        return $this->ranking ??= $this->exam()->ranking($this->position());
     }
 
     /**
@@ -122,6 +145,7 @@ class StoreInterviewRequest extends FormRequest
     public function attributes(): array
     {
         return [
+            'exam_position_id' => 'posisi',
             'user_ids' => 'kandidat',
             'scheduled_at' => 'jadwal',
             'location' => 'tempat / link',

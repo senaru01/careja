@@ -14,13 +14,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * A test session: an online theory exam run by an LPK for one company, with
  * the position, qualifications, quota and schedule announced up front.
  */
 #[Fillable([
-    'company_id', 'title', 'position', 'qualifications', 'quota', 'min_participants',
+    'company_id', 'recruitment_request_id', 'title', 'position', 'qualifications', 'quota', 'min_participants',
     'description', 'duration_minutes', 'passing_score', 'starts_at', 'ends_at',
 ])]
 class Exam extends Model
@@ -39,6 +40,7 @@ class Exam extends Model
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
             'published_at' => 'datetime',
+            'started_at' => 'datetime',
         ];
     }
 
@@ -60,6 +62,47 @@ class Exam extends Model
     public function company(): BelongsTo
     {
         return $this->belongsTo(Organization::class, 'company_id');
+    }
+
+    /**
+     * The company request this session follows up, if any.
+     *
+     * @return BelongsTo<RecruitmentRequest, $this>
+     */
+    public function recruitmentRequest(): BelongsTo
+    {
+        return $this->belongsTo(RecruitmentRequest::class);
+    }
+
+    /**
+     * Positions offered in this session, each with its own quota.
+     *
+     * @return HasMany<ExamPosition, $this>
+     */
+    public function positions(): HasMany
+    {
+        return $this->hasMany(ExamPosition::class)->orderBy('id');
+    }
+
+    /**
+     * Replace the position table. The session's position and quota columns
+     * keep the summary (names and total) used in lists and notifications.
+     *
+     * @param  array<int, array<string, mixed>>  $positions
+     */
+    public function syncPositions(array $positions): void
+    {
+        DB::transaction(function () use ($positions) {
+            $this->positions()->delete();
+            $this->positions()->createMany($positions);
+
+            $this->forceFill([
+                'position' => collect($positions)->pluck('position')->implode(', '),
+                'quota' => collect($positions)->sum('quota'),
+            ])->save();
+        });
+
+        $this->unsetRelation('positions');
     }
 
     /**
@@ -132,9 +175,31 @@ class Exam extends Model
         return match (true) {
             ! $this->isPublished() => ExamPhase::Draft,
             $this->starts_at === null || now()->lessThan($this->starts_at) => ExamPhase::Open,
-            $this->ends_at === null || now()->lessThan($this->ends_at) => ExamPhase::Running,
-            default => ExamPhase::Finished,
+            $this->ends_at !== null && now()->greaterThanOrEqualTo($this->ends_at) => ExamPhase::Finished,
+            $this->started_at === null => ExamPhase::Waiting,
+            default => ExamPhase::Running,
         };
+    }
+
+    /**
+     * Registration is closed and the participants wait in the room for the
+     * LPK to start the test.
+     */
+    public function isWaitingForStart(): bool
+    {
+        return $this->phase() === ExamPhase::Waiting;
+    }
+
+    /**
+     * Start the test for everyone in the room. The session closes when the
+     * duration is over, so every participant works within the same window.
+     */
+    public function startNow(): void
+    {
+        $this->forceFill([
+            'started_at' => now(),
+            'ends_at' => now()->addMinutes($this->duration_minutes),
+        ])->save();
     }
 
     public function isOpenForRegistration(): bool
@@ -175,6 +240,20 @@ class Exam extends Model
     }
 
     /**
+     * The most recent transfer proof the admin rejected for this session and
+     * purpose, so the payer sees why and can send a new one.
+     */
+    public function latestRejectedPayment(PaymentPurpose $purpose, ?User $payer = null): ?Payment
+    {
+        return $this->payments()
+            ->where('purpose', $purpose)
+            ->where('status', PaymentStatus::Rejected)
+            ->when($payer, fn ($query) => $query->where('user_id', $payer->id))
+            ->latest('id')
+            ->first();
+    }
+
+    /**
      * Determine if the company paid the interview fee that unlocks inviting
      * candidates from this session's ranking.
      */
@@ -206,15 +285,17 @@ class Exam extends Model
 
     /**
      * Participants that passed, best first: highest score, then the fastest
-     * finish, then whoever submitted first. Each attempt gets a `rank`.
+     * finish, then whoever submitted first. Each attempt gets a `rank`. With a
+     * position, only the participants that applied for it are ranked.
      *
      * @return Collection<int, ExamAttempt>
      */
-    public function ranking(): Collection
+    public function ranking(?ExamPosition $position = null): Collection
     {
         return $this->participants()
             ->where('passed', true)
-            ->with(['user.candidateProfile', 'user.skills'])
+            ->when($position, fn ($query) => $query->where('exam_position_id', $position->id))
+            ->with(['user.candidateProfile', 'user.skills', 'position'])
             ->get()
             ->sort(function (ExamAttempt $a, ExamAttempt $b) {
                 return [$b->score, $a->durationSeconds(), $a->submitted_at, $a->id]
@@ -225,12 +306,35 @@ class Exam extends Model
     }
 
     /**
-     * Interviews that still hold one of the quota seats: scheduled, or passed
-     * and not declared unfit at the medical checkup.
+     * One ranking per position (or a single one for sessions without a
+     * position table), each with its own quota.
+     *
+     * @return Collection<int, array{position: ExamPosition|null, label: string, quota: int, ranking: Collection<int, ExamAttempt>}>
      */
-    public function filledSeats(): int
+    public function rankingGroups(): Collection
+    {
+        $positions = $this->relationLoaded('positions') ? $this->positions : $this->positions()->get();
+
+        if ($positions->isEmpty()) {
+            return collect([['position' => null, 'label' => (string) ($this->position ?? $this->title), 'quota' => (int) $this->quota, 'ranking' => $this->ranking()]]);
+        }
+
+        return $positions->map(fn (ExamPosition $position) => [
+            'position' => $position,
+            'label' => $position->position,
+            'quota' => $position->quota,
+            'ranking' => $this->ranking($position),
+        ]);
+    }
+
+    /**
+     * Interviews that still hold one of the quota seats (of one position, if
+     * given): scheduled, or passed and not declared unfit at the medical checkup.
+     */
+    public function filledSeats(?ExamPosition $position = null): int
     {
         return $this->interviews()
+            ->when($position, fn ($query) => $query->where('exam_position_id', $position->id))
             ->where(fn ($query) => $query
                 ->where('status', InterviewStatus::Scheduled)
                 ->orWhere(fn ($query) => $query
@@ -239,9 +343,9 @@ class Exam extends Model
             ->count();
     }
 
-    public function openSeats(): int
+    public function openSeats(?ExamPosition $position = null): int
     {
-        return max(0, (int) $this->quota - $this->filledSeats());
+        return max(0, (int) ($position ? $position->quota : $this->quota) - $this->filledSeats($position));
     }
 
     /**

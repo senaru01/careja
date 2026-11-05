@@ -46,8 +46,9 @@
                         @endif
                         <ul class="list-disc ms-5">
                             <li>Penyelenggara: {{ $attempt->exam->organization->name }}</li>
-                            <li>Jadwal: <strong>{{ $attempt->exam->starts_at?->translatedFormat('d M Y H:i') }} – {{ $attempt->exam->ends_at?->translatedFormat('d M Y H:i') }} WIB</strong>. Tes harus selesai sebelum sesi ditutup.</li>
-                            <li>Durasi: <strong>{{ $attempt->exam->duration_minutes }} menit</strong>, waktu berjalan sejak tombol Mulai ditekan.</li>
+                            <li>Jadwal: <strong>{{ $attempt->exam->starts_at?->translatedFormat('d M Y H:i') }} WIB</strong>. Tes dikerjakan bersama di ruangan dan dimulai oleh pengawas LPK.</li>
+                            <li>Durasi: <strong>{{ $attempt->exam->duration_minutes }} menit</strong>, waktu berjalan sejak pengawas memulai tes (sama untuk semua peserta).</li>
+                            <li>Setiap jawaban tersimpan otomatis saat dipilih.</li>
                             <li>Nilai lulus minimal: <strong>{{ $attempt->exam->passing_score }}</strong>.</li>
                             <li>Jawaban otomatis terkirim saat waktu habis. Jawaban yang dikirim setelah waktu habis tidak dinilai.</li>
                             <li>Tes hanya bisa dikerjakan satu kali.</li>
@@ -58,8 +59,14 @@
                             @csrf
                             <x-primary-button onclick="return confirm('Mulai tes sekarang? Waktu akan langsung berjalan.')">Mulai Tes</x-primary-button>
                         </form>
+                    @elseif ($attempt->exam->isWaitingForStart())
+                        <div class="mt-6 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">
+                            <div class="font-semibold">Menunggu pengawas memulai tes…</div>
+                            <p class="mt-1">Halaman ini memeriksa otomatis setiap 10 detik. Tombol Mulai Tes muncul begitu pengawas LPK memulai.</p>
+                        </div>
+                        <script>setTimeout(() => window.location.reload(), 10000);</script>
                     @elseif ($attempt->exam->isOpenForRegistration())
-                        <p class="mt-6 text-sm font-semibold text-blue-800">Tes dibuka {{ $attempt->exam->starts_at->diffForHumans() }}.</p>
+                        <p class="mt-6 text-sm font-semibold text-blue-800">Tes dijadwalkan {{ $attempt->exam->starts_at->diffForHumans() }}.</p>
                     @else
                         <p class="mt-6 text-sm font-semibold text-red-700">Sesi tes sudah ditutup.</p>
                     @endif
@@ -72,7 +79,9 @@
                     <span class="text-xl font-mono font-semibold" :class="remaining < 60000 ? 'text-red-600' : 'text-slate-900'" x-text="label"></span>
                 </div>
 
-                <form id="exam-form" method="POST" action="{{ route('worker.attempts.submit', $attempt) }}" class="space-y-4">
+                @php($savedAnswers = $attempt->answers->pluck('exam_option_id', 'exam_question_id'))
+                <form id="exam-form" method="POST" action="{{ route('worker.attempts.submit', $attempt) }}" class="space-y-4"
+                      x-data="answerSaver(@js(route('worker.attempts.answer', $attempt)))" @change="save($event)">
                     @csrf
                     {{-- Order is shuffled per candidate (stable across refreshes); grading uses ids, so order does not matter. --}}
                     @foreach ($attempt->exam->questions->sortBy(fn ($question) => crc32($attempt->id.'-q-'.$question->id)) as $question)
@@ -81,7 +90,8 @@
                             <div class="space-y-2">
                                 @foreach ($question->options->sortBy(fn ($option) => crc32($attempt->id.'-o-'.$option->id)) as $option)
                                     <label class="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:bg-blue-50/50 cursor-pointer">
-                                        <input type="radio" name="answers[{{ $question->id }}]" value="{{ $option->id }}" class="text-blue-700">
+                                        <input type="radio" name="answers[{{ $question->id }}]" value="{{ $option->id }}" class="text-blue-700"
+                                               data-question="{{ $question->id }}" @checked($savedAnswers->get($question->id) === $option->id)>
                                         <span class="text-sm">{{ $option->text }}</span>
                                     </label>
                                 @endforeach
@@ -89,10 +99,44 @@
                         </x-card>
                     @endforeach
 
-                    <x-primary-button onclick="return confirm('Kirim jawaban sekarang? Jawaban tidak dapat diubah lagi.')">Kirim Jawaban</x-primary-button>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <x-primary-button onclick="return confirm('Kirim jawaban sekarang? Jawaban tidak dapat diubah lagi.')">Kirim Jawaban</x-primary-button>
+                        <span class="text-xs" :class="failed ? 'text-red-600' : 'text-slate-500'" x-text="message"></span>
+                    </div>
                 </form>
 
                 <script>
+                    function answerSaver(url) {
+                        return {
+                            message: 'Jawaban tersimpan otomatis setiap kali Anda memilih.',
+                            failed: false,
+                            async save(event) {
+                                const input = event.target;
+                                if (input.type !== 'radio' || ! input.dataset.question) {
+                                    return;
+                                }
+                                try {
+                                    const response = await fetch(url, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            Accept: 'application/json',
+                                            'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                                        },
+                                        body: JSON.stringify({ question_id: Number(input.dataset.question), option_id: Number(input.value) }),
+                                    });
+                                    this.failed = ! response.ok;
+                                    this.message = response.ok
+                                        ? 'Tersimpan ' + new Date().toLocaleTimeString('id-ID')
+                                        : 'Gagal menyimpan, jawaban tetap dikirim saat Anda menekan Kirim Jawaban.';
+                                } catch (error) {
+                                    this.failed = true;
+                                    this.message = 'Koneksi terputus, jawaban tetap dikirim saat Anda menekan Kirim Jawaban.';
+                                }
+                            },
+                        };
+                    }
+
                     function examTimer(deadline) {
                         return {
                             remaining: deadline - Date.now(),

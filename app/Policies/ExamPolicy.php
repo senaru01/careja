@@ -71,6 +71,32 @@ class ExamPolicy
     }
 
     /**
+     * Everyone takes the test together in one room: the LPK starts it once
+     * registration is closed (the scheduled start time has passed).
+     */
+    public function start(User $user, Exam $exam): Response
+    {
+        if (! $this->view($user, $exam)) {
+            return Response::deny();
+        }
+
+        return match (true) {
+            $exam->isOpenForRegistration() => Response::deny('Tes baru bisa dimulai pada jadwal: '.$exam->starts_at->translatedFormat('d M Y H:i').' WIB.'),
+            ! $exam->isWaitingForStart() => Response::deny('Tes ini sudah dimulai atau sudah selesai.'),
+            default => Response::allow(),
+        };
+    }
+
+    /**
+     * The live score board is open to the LPK running the session and the
+     * company it recruits for.
+     */
+    public function monitor(User $user, Exam $exam): bool
+    {
+        return $this->view($user, $exam) || $this->follow($user, $exam);
+    }
+
+    /**
      * Company staff follow the sessions run for their company.
      */
     public function follow(User $user, Exam $exam): bool
