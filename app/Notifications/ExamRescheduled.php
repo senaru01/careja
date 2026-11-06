@@ -20,6 +20,6 @@ class ExamRescheduled extends ActivityNotification
             ->line('Jadwal baru: '.$this->reschedule->starts_at->translatedFormat('l, d F Y H:i').' WIB')
             ->line('Alasan: '.$this->reschedule->reason)
             ->line('Jika Anda tidak bisa mengikuti jadwal baru, tekan "Keluar Sesi" sebelum jadwal baru dimulai. Anda akan mendapat 1 token untuk ikut sesi tes lain tanpa bayar lagi. Jika tidak melakukan apa-apa dan tidak hadir, biaya tes hangus.')
-            ->action('Lihat Sesi', route('worker.sessions.show', $this->exam));
+            ->action('Lihat Sesi', $this->linkFor($notifiable, 'worker.sessions.show', $this->exam));
     }
 }

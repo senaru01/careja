@@ -1,3 +1,5 @@
+{{-- Payment verification, for the Careja admin (every payment) and for an LPK
+     that takes membership fees on its own account ($routePrefix: admin.payments | lpk.payments). --}}
 <x-app-layout>
     <x-slot name="header">
         <h2 class="text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900">Verifikasi Pembayaran</h2>
@@ -7,14 +9,20 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-4">
             <x-flash />
 
+            @if ($routePrefix === 'lpk.payments')
+                <p class="rounded-2xl bg-blue-50 p-4 text-sm text-blue-900 ring-1 ring-blue-200">
+                    Bukti transfer keanggotaan yang dibayar member langsung ke rekening LPK Anda. Cek mutasi rekening, lalu verifikasi agar keanggotaan member aktif.
+                </p>
+            @endif
+
             <div class="flex gap-2">
                 @foreach ($statuses as $option)
-                    <a href="{{ route('admin.payments.index', ['status' => $option->value]) }}"
+                    <a href="{{ route($routePrefix.'.index', ['status' => $option->value]) }}"
                        class="px-4 py-2 rounded-full text-sm font-medium {{ $status === $option ? 'bg-blue-900 text-white' : 'bg-white/80 text-slate-600 hover:bg-white' }}">
                         {{ $option->label() }}
                     </a>
                 @endforeach
-                <a href="{{ route('admin.payments.index', ['status' => 'all']) }}"
+                <a href="{{ route($routePrefix.'.index', ['status' => 'all']) }}"
                    class="px-4 py-2 rounded-full text-sm font-medium {{ $status === null ? 'bg-blue-900 text-white' : 'bg-white/80 text-slate-600 hover:bg-white' }}">Semua</a>
             </div>
 
@@ -36,6 +44,12 @@
                                 <td class="px-4 py-3">
                                     <div class="font-medium">{{ $payment->user->name }}</div>
                                     <div class="text-slate-500">{{ $payment->user->email }}</div>
+                                    @if ($routePrefix === 'admin.payments' && $payment->lpk)
+                                        <div class="text-xs font-medium text-blue-700">{{ $payment->lpk->name }}</div>
+                                    @endif
+                                    @if ($routePrefix === 'admin.payments' && $payment->isCollectedByLpk())
+                                        <x-badge color="indigo">Diterima langsung LPK</x-badge>
+                                    @endif
                                 </td>
                                 <td class="px-4 py-3">
                                     Rp {{ number_format($payment->amount, 0, ',', '.') }}
@@ -47,7 +61,7 @@
                                         <x-badge color="blue">QRIS otomatis</x-badge>
                                         <div class="text-xs text-slate-400 mt-1">{{ $payment->gateway_order_id }}</div>
                                     @else
-                                        <a class="text-blue-700 underline" target="_blank" href="{{ route('admin.payments.proof', $payment) }}">Lihat bukti</a>
+                                        <a class="text-blue-700 underline" target="_blank" href="{{ route($routePrefix.'.proof', $payment) }}">Lihat bukti</a>
                                     @endif
                                 </td>
                                 <td class="px-4 py-3">
@@ -85,12 +99,12 @@
                                                     default => 'keanggotaan aktif',
                                                 } }}
                                             </div>
-                                            <form method="POST" action="{{ route('admin.payments.update', $payment) }}">
+                                            <form method="POST" action="{{ route($routePrefix.'.update', $payment) }}">
                                                 @csrf @method('PATCH')
                                                 <input type="hidden" name="status" value="verified">
                                                 <x-primary-button>Verifikasi</x-primary-button>
                                             </form>
-                                            <form method="POST" action="{{ route('admin.payments.update', $payment) }}" class="flex gap-2">
+                                            <form method="POST" action="{{ route($routePrefix.'.update', $payment) }}" class="flex gap-2">
                                                 @csrf @method('PATCH')
                                                 <input type="hidden" name="status" value="rejected">
                                                 <x-text-input name="note" class="text-xs py-1" placeholder="Alasan penolakan" required />

@@ -9,12 +9,13 @@ use Illuminate\Auth\Access\Response;
 class RecruitmentRequestPolicy
 {
     /**
-     * Company staff see their own company's requests; LPK staff see every
-     * request so they can follow it up.
+     * Company staff see their own company's requests; LPK staff see the
+     * requests sent to their LPK so they can follow them up.
      */
     public function view(User $user, RecruitmentRequest $request): bool
     {
-        return $user->isLpk() || ($user->isCompany() && $user->organization_id === $request->company_id);
+        return ($user->isLpk() && $request->isSentTo($user->organization))
+            || ($user->isCompany() && $user->organization_id === $request->company_id);
     }
 
     /**
@@ -51,11 +52,11 @@ class RecruitmentRequestPolicy
     }
 
     /**
-     * LPK staff turn an open request into a test session.
+     * LPK staff turn an open request sent to their LPK into a test session.
      */
     public function followUp(User $user, RecruitmentRequest $request): Response
     {
-        if (! $user->isLpk()) {
+        if (! $user->isLpk() || ! $request->isSentTo($user->organization)) {
             return Response::denyAsNotFound();
         }
 

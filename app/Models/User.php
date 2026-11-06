@@ -70,7 +70,8 @@ class User extends Authenticatable
     }
 
     /**
-     * The LPK or company this account belongs to.
+     * The LPK or company this account belongs to. For a job seeker: the LPK
+     * whose subdomain they registered on.
      *
      * @return BelongsTo<Organization, $this>
      */
@@ -235,6 +236,50 @@ class User extends Authenticatable
     }
 
     /**
+     * Scope a query to job seekers whose data the viewer may see: an LPK sees
+     * its own members, a company the members of its connected LPKs, the
+     * super admin everybody.
+     *
+     * @param  Builder<User>  $query
+     */
+    #[Scope]
+    protected function candidatesOf(Builder $query, User $viewer): void
+    {
+        $lpkIds = $viewer->visibleLpkIds();
+
+        $query->where('role', UserRole::Worker)
+            ->when($lpkIds !== null, fn (Builder $query) => $query->whereIn('organization_id', $lpkIds));
+    }
+
+    /**
+     * The LPKs whose members this user may see, or null for all of them (super admin).
+     *
+     * @return list<int>|null
+     */
+    public function visibleLpkIds(): ?array
+    {
+        return match (true) {
+            $this->isSuperAdmin() => null,
+            $this->isLpk() => [(int) $this->organization_id],
+            $this->isCompany() => $this->organization?->connectedLpks()->pluck('organizations.id')->map(fn ($id) => (int) $id)->all() ?? [],
+            default => [],
+        };
+    }
+
+    /**
+     * Staff and members log in on their own organization's subdomain, the
+     * super admin on the root domain.
+     */
+    public function canLogInOn(?Organization $tenant): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return $tenant === null;
+        }
+
+        return $tenant !== null && $this->organization_id === $tenant->id;
+    }
+
+    /**
      * Scope a query to candidates that passed at least one theory exam.
      *
      * @param  Builder<User>  $query
@@ -294,8 +339,9 @@ class User extends Authenticatable
 
     /**
      * Determine if the given user may see this candidate's profile, photo and
-     * documents. LPK and company staff see active candidates, plus candidates
-     * they already tested or interviewed so they can finish that stage.
+     * documents. LPK staff see the active members of their LPK, company staff
+     * the active members of their connected LPKs, plus candidates they
+     * already tested or interviewed so they can finish that stage.
      */
     public function isCandidateVisibleTo(User $viewer): bool
     {
@@ -311,7 +357,7 @@ class User extends Authenticatable
             return false;
         }
 
-        if ($this->hasActiveMembership()) {
+        if ($this->hasActiveMembership() && in_array((int) $this->organization_id, $viewer->visibleLpkIds(), true)) {
             return true;
         }
 

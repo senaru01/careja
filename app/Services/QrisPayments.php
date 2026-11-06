@@ -7,6 +7,7 @@ use App\Enums\PaymentPurpose;
 use App\Enums\PaymentStatus;
 use App\Models\Exam;
 use App\Models\Interview;
+use App\Models\Organization;
 use App\Models\Payment;
 use App\Models\User;
 use Illuminate\Support\Carbon;
@@ -37,8 +38,19 @@ class QrisPayments
      */
     public function startMembership(User $user): ?Payment
     {
-        return $this->start($user, PaymentPurpose::Membership, config('careja.registration_fee'),
-            'Keanggotaan Careja '.config('careja.membership_months').' bulan');
+        $lpk = $user->organization;
+
+        return $this->start($user, PaymentPurpose::Membership, PaymentPurpose::Membership->fee($lpk),
+            'Keanggotaan '.($lpk->name ?? 'Careja').' '.config('careja.membership_months').' bulan', lpk: $lpk);
+    }
+
+    /**
+     * Determine if the user's LPK takes the membership through Careja's QRIS
+     * (an LPK that collects it on its own account only takes transfers).
+     */
+    public function isAvailableForMembership(User $user): bool
+    {
+        return $this->isAvailable() && ! $user->organization?->collectsMembershipDirectly();
     }
 
     /**
@@ -46,7 +58,7 @@ class QrisPayments
      */
     public function startExamSession(User $lpkStaff, Exam $exam): ?Payment
     {
-        return $this->start($lpkStaff, PaymentPurpose::ExamSession, config('careja.exam_session_fee'),
+        return $this->start($lpkStaff, PaymentPurpose::ExamSession, PaymentPurpose::ExamSession->fee($exam->organization),
             'Penerbitan sesi tes: '.$exam->title, $exam);
     }
 
@@ -55,7 +67,7 @@ class QrisPayments
      */
     public function startExamRegistration(User $worker, Exam $exam): ?Payment
     {
-        return $this->start($worker, PaymentPurpose::ExamRegistration, config('careja.exam_registration_fee'),
+        return $this->start($worker, PaymentPurpose::ExamRegistration, PaymentPurpose::ExamRegistration->fee($exam->organization),
             'Pendaftaran tes: '.$exam->title, $exam);
     }
 
@@ -64,7 +76,7 @@ class QrisPayments
      */
     public function startInterviewAccess(User $companyStaff, Exam $exam): ?Payment
     {
-        return $this->start($companyStaff, PaymentPurpose::InterviewAccess, config('careja.interview_fee'),
+        return $this->start($companyStaff, PaymentPurpose::InterviewAccess, PaymentPurpose::InterviewAccess->fee($exam->organization),
             'Pengambilan kandidat: '.$exam->position, $exam);
     }
 
@@ -73,7 +85,7 @@ class QrisPayments
      */
     public function startMedicalCheckup(User $worker, Interview $interview): ?Payment
     {
-        return $this->start($worker, PaymentPurpose::MedicalCheckup, config('careja.medical_checkup_fee'),
+        return $this->start($worker, PaymentPurpose::MedicalCheckup, PaymentPurpose::MedicalCheckup->fee($interview->exam?->organization),
             'Medical checkup: '.$interview->organization->name, $interview->exam, $interview);
     }
 
@@ -90,12 +102,13 @@ class QrisPayments
      * Create a pending payment and a QRIS code for it. Returns null when
      * Midtrans refused or could not be reached (the payment is removed).
      */
-    public function start(User $user, PaymentPurpose $purpose, int $amount, string $itemName, ?Exam $exam = null, ?Interview $interview = null, bool $isDemo = false): ?Payment
+    public function start(User $user, PaymentPurpose $purpose, int $amount, string $itemName, ?Exam $exam = null, ?Interview $interview = null, bool $isDemo = false, ?Organization $lpk = null): ?Payment
     {
         $payment = $user->payments()->make(['amount' => $amount]);
         $payment->forceFill([
             'purpose' => $purpose,
             'exam_id' => $exam?->id,
+            'lpk_id' => ($lpk ?? $exam?->organization)?->id,
             'interview_id' => $interview?->id,
             'is_demo' => $isDemo,
             'method' => PaymentMethod::Midtrans,

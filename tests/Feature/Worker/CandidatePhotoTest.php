@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Worker;
 
+use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -73,26 +74,26 @@ class CandidatePhotoTest extends TestCase
 
     public function test_photo_is_visible_to_partners_only_while_the_candidate_is_active(): void
     {
-        $candidate = User::factory()->activeCandidate()->create();
+        $candidate = User::factory()->memberOf(Organization::factory()->lpk()->create())->activeCandidate()->create();
         $this->actingAs($candidate)->post(route('worker.photo.store'), ['photo' => UploadedFile::fake()->image('foto.jpg', 400, 400)]);
 
         $this->actingAs($candidate)->get(route('candidates.photo', $candidate))->assertOk();
-        $this->actingAs(User::factory()->company()->create())->get(route('candidates.photo', $candidate))->assertOk();
+        $this->actingAs(User::factory()->company(Organization::factory()->connectedTo($candidate->organization)->create())->create())->get(route('candidates.photo', $candidate))->assertOk();
         $this->actingAs(User::factory()->create())->get(route('candidates.photo', $candidate))->assertNotFound();
 
         $this->travel(1)->years();
         $this->travel(1)->days();
 
-        $this->actingAs(User::factory()->lpk()->create())->get(route('candidates.photo', $candidate))->assertNotFound();
+        $this->actingAs(User::factory()->lpk($candidate->organization)->create())->get(route('candidates.photo', $candidate))->assertNotFound();
     }
 
     public function test_photo_appears_on_the_dashboard_and_candidate_list(): void
     {
-        $candidate = User::factory()->activeCandidate()->create();
+        $candidate = User::factory()->memberOf(Organization::factory()->lpk()->create())->activeCandidate()->create();
         $this->actingAs($candidate)->post(route('worker.photo.store'), ['photo' => UploadedFile::fake()->image('foto.jpg', 400, 400)]);
         $photoRoute = route('candidates.photo', $candidate);
 
         $this->actingAs($candidate)->get(route('dashboard'))->assertSee($photoRoute, false);
-        $this->actingAs(User::factory()->company()->create())->get(route('candidates.index'))->assertSee($photoRoute, false);
+        $this->actingAs(User::factory()->lpk($candidate->organization)->create())->get(route('candidates.index'))->assertSee($photoRoute, false);
     }
 }

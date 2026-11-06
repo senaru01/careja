@@ -7,6 +7,7 @@ use App\Models\CandidateProfile;
 use App\Models\Exam;
 use App\Models\ExamAttempt;
 use App\Models\Interview;
+use App\Models\Organization;
 use App\Models\Payment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -50,8 +51,8 @@ class MembershipTest extends TestCase
 
     public function test_candidate_disappears_from_partners_after_one_year(): void
     {
-        $candidate = User::factory()->activeCandidate()->create(['name' => 'Kandidat Setahun']);
-        $company = User::factory()->company()->create();
+        $candidate = User::factory()->memberOf(Organization::factory()->lpk()->create())->activeCandidate()->create(['name' => 'Kandidat Setahun']);
+        $company = User::factory()->company(Organization::factory()->connectedTo($candidate->organization)->create())->create();
 
         $this->actingAs($company)->get(route('candidates.index'))->assertSee('Kandidat Setahun');
 
@@ -67,6 +68,7 @@ class MembershipTest extends TestCase
     {
         $exam = Exam::factory()->upcoming()->withQuestions()->create();
         $candidate = $this->workerWithCompleteProfile();
+        $candidate->forceFill(['organization_id' => $exam->organization_id])->save();
         Payment::factory()->for($candidate)->expired()->create();
 
         $this->actingAs($candidate)
@@ -122,7 +124,7 @@ class MembershipTest extends TestCase
 
     public function test_dashboard_shows_the_expiry_date(): void
     {
-        $candidate = User::factory()->activeCandidate()->create();
+        $candidate = User::factory()->memberOf(Organization::factory()->lpk()->create())->activeCandidate()->create();
         $expiresAt = $candidate->activeMembership()->expires_at;
 
         $this->actingAs($candidate)

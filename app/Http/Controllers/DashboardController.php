@@ -42,6 +42,7 @@ class DashboardController extends Controller
         return view('dashboard.worker', [
             'user' => $user,
             'openSessions' => Exam::query()
+                ->where('organization_id', $user->organization_id)
                 ->whereNotNull('published_at')
                 ->where('starts_at', '>', now())
                 ->whereNotIn('id', $joinedExamIds)
@@ -68,7 +69,7 @@ class DashboardController extends Controller
         return view('dashboard.lpk', [
             'organization' => $user->organization,
             'stats' => [
-                'Kandidat Aktif' => User::activeCandidates()->count(),
+                'Member Aktif' => User::activeCandidates()->candidatesOf($user)->count(),
                 'Sesi Tes Terbit' => $user->organization->exams()->whereNotNull('published_at')->count(),
                 'Tes Dikerjakan' => (clone $attempts)->whereNotNull('submitted_at')->count(),
                 'Lulus Teori' => (clone $attempts)->where('passed', true)->count(),
@@ -82,12 +83,14 @@ class DashboardController extends Controller
                 ->limit(5)
                 ->get(),
             'openRequests' => RecruitmentRequest::open()
+                ->sentTo($user->organization)
                 ->whereDoesntHave('exams')
                 ->with(['company', 'positions'])
                 ->latest()
                 ->limit(5)
                 ->get(),
             'activeCandidates' => User::activeCandidates()
+                ->candidatesOf($user)
                 ->with(['candidateProfile', 'workExperiences', 'payments' => fn ($query) => $query->active()])
                 ->latest()
                 ->limit(8)

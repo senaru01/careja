@@ -20,6 +20,15 @@
                         <x-text-input id="name" name="name" class="mt-1 block w-full" :value="old('name')" required />
                         <x-input-error :messages="$errors->get('name')" class="mt-1" />
                     </div>
+                    <div class="sm:col-span-2">
+                        <x-input-label for="subdomain" value="Alamat (subdomain)" />
+                        <div class="mt-1 flex items-center gap-2">
+                            <x-text-input id="subdomain" name="subdomain" class="block w-48" :value="old('subdomain')" placeholder="oki" required />
+                            <span class="text-sm text-slate-500">.{{ config('careja.root_domain') }}</span>
+                        </div>
+                        <x-input-error :messages="$errors->get('subdomain')" class="mt-1" />
+                        <p class="text-xs text-slate-500 mt-1">Pencari kerja yang daftar lewat alamat LPK otomatis jadi member LPK itu. Staf LPK / perusahaan hanya bisa login di alamatnya sendiri.</p>
+                    </div>
                     <div>
                         <x-input-label for="email" value="Email kantor (opsional)" />
                         <x-text-input id="email" type="email" name="email" class="mt-1 block w-full" :value="old('email')" />

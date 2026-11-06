@@ -137,6 +137,6 @@ class LiveSessionTest extends TestCase
         $this->actingAs(User::factory()->company($exam->company)->create())->getJson(route('sessions.live.data', $exam))->assertOk();
         $this->actingAs(User::factory()->company()->create())->getJson(route('sessions.live.data', $exam))->assertForbidden();
         $this->actingAs(User::factory()->lpk()->create())->getJson(route('sessions.live.data', $exam))->assertForbidden();
-        $this->actingAs(User::factory()->activeCandidate()->create())->getJson(route('sessions.live.data', $exam))->assertForbidden();
+        $this->actingAs(User::factory()->memberOf($exam->organization)->activeCandidate()->create())->getJson(route('sessions.live.data', $exam))->assertForbidden();
     }
 }

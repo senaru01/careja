@@ -10,20 +10,35 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     @php
-        $rupiah = fn (string $key): string => 'Rp'.number_format(config($key), 0, ',', '.');
+        // On an LPK's subdomain the catalog shows that LPK's own prices.
+        $feeLpk = $tenant?->isLpk() ? $tenant : null;
+        $rupiah = fn (string $key): string => 'Rp'.number_format((match ($key) {
+            'careja.registration_fee' => \App\Enums\PaymentPurpose::Membership,
+            'careja.exam_session_fee' => \App\Enums\PaymentPurpose::ExamSession,
+            'careja.exam_registration_fee' => \App\Enums\PaymentPurpose::ExamRegistration,
+            'careja.interview_fee' => \App\Enums\PaymentPurpose::InterviewAccess,
+            'careja.medical_checkup_fee' => \App\Enums\PaymentPurpose::MedicalCheckup,
+        })->fee($feeLpk), 0, ',', '.');
     @endphp
     <body class="font-sans antialiased overflow-x-hidden">
         <x-batik.parang class="h-2 text-blue-800/70" />
 
         <header class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-5 flex justify-between items-center">
-            <a href="/" class="inline-flex items-center rounded-full bg-white px-4 py-1.5 shadow-sm ring-1 ring-slate-200/60"><x-application-logo class="h-8" /></a>
+            <a href="/" class="inline-flex items-center gap-3 rounded-full bg-white px-4 py-1.5 shadow-sm ring-1 ring-slate-200/60">
+                <x-application-logo class="h-8" />
+                @if ($tenant)
+                    <span class="border-l border-slate-200 pl-3 text-sm font-semibold text-blue-900">{{ $tenant->name }}</span>
+                @endif
+            </a>
             <nav class="flex items-center gap-3">
                 <a href="#biaya" class="hidden sm:inline text-sm font-semibold text-blue-800 hover:underline">Biaya</a>
                 @auth
                     <a href="{{ route('dashboard') }}"><x-primary-button type="button">Dashboard</x-primary-button></a>
                 @else
                     <a href="{{ route('login') }}"><x-secondary-button>Masuk</x-secondary-button></a>
-                    <a href="{{ route('register') }}" class="hidden sm:inline-flex"><x-primary-button type="button">Daftar Pencari Kerja</x-primary-button></a>
+                    @if (! $tenant?->isCompany())
+                        <a href="{{ route('register') }}" class="hidden sm:inline-flex"><x-primary-button type="button">Daftar Pencari Kerja</x-primary-button></a>
+                    @endif
                 @endauth
             </nav>
         </header>

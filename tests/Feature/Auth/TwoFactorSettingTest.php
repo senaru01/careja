@@ -15,7 +15,7 @@ class TwoFactorSettingTest extends TestCase
     public function test_user_with_two_factor_disabled_logs_in_directly(): void
     {
         Notification::fake();
-        $user = User::factory()->create(['two_factor_enabled' => false]);
+        $user = User::factory()->superAdmin()->create(['two_factor_enabled' => false]);
 
         $response = $this->post('/login', ['email' => $user->email, 'password' => 'password']);
 
@@ -28,7 +28,7 @@ class TwoFactorSettingTest extends TestCase
     {
         Notification::fake();
         config(['careja.two_factor_enabled' => false]);
-        $user = User::factory()->create();
+        $user = User::factory()->superAdmin()->create();
 
         $this->post('/login', ['email' => $user->email, 'password' => 'password']);
 
@@ -59,7 +59,7 @@ class TwoFactorSettingTest extends TestCase
     {
         Notification::fake();
         $admin = User::factory()->superAdmin()->create();
-        $user = User::factory()->create();
+        $user = User::factory()->superAdmin()->create();
 
         $this->actingAs($admin)->patch(route('admin.users.two-factor', $user))->assertSessionHas('status');
         $this->assertFalse($user->fresh()->two_factor_enabled);

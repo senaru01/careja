@@ -22,7 +22,7 @@ class AuthenticationTest extends TestCase
     public function test_valid_credentials_start_the_two_factor_challenge_without_logging_in(): void
     {
         Notification::fake();
-        $user = User::factory()->create();
+        $user = User::factory()->superAdmin()->create();
 
         $response = $this->post('/login', [
             'email' => $user->email,

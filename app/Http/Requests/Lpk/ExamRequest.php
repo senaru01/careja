@@ -32,8 +32,16 @@ class ExamRequest extends FormRequest
     {
         return [
             'title' => ['required', 'string', 'max:255'],
-            'company_id' => ['required', 'integer', Rule::exists(Organization::class, 'id')->where('type', OrganizationType::Company->value)],
-            'recruitment_request_id' => ['nullable', 'integer', Rule::exists(RecruitmentRequest::class, 'id')->whereNull('closed_at')],
+            'company_id' => [
+                'required', 'integer',
+                Rule::exists(Organization::class, 'id')->where('type', OrganizationType::Company->value),
+                Rule::in($this->user()->organization->connectedCompanies()->pluck('organizations.id')->all()),
+            ],
+            'recruitment_request_id' => [
+                'nullable', 'integer',
+                Rule::exists(RecruitmentRequest::class, 'id')->whereNull('closed_at'),
+                Rule::in($this->user()->organization->receivedRecruitmentRequests()->pluck('recruitment_requests.id')->all()),
+            ],
             ...$this->positionRules(),
             'qualifications' => ['nullable', 'string', 'max:3000'],
             'min_participants' => ['nullable', 'integer', 'min:1', 'max:10000'],
@@ -59,6 +67,17 @@ class ExamRequest extends FormRequest
                     $validator->errors()->add('company_id', 'Perusahaan harus sama dengan perusahaan yang mengirim permintaan rekrutmen.');
                 }
             },
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'company_id.in' => 'Pilih perusahaan yang terhubung dengan LPK Anda.',
+            'recruitment_request_id.in' => 'Permintaan rekrutmen ini tidak dikirim ke LPK Anda.',
         ];
     }
 

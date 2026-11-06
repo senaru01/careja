@@ -50,7 +50,7 @@ class ManualPaymentTest extends TestCase
     {
         $lpk = User::factory()->lpk()->create();
         $exam = Exam::factory()->for($lpk->organization)->draft()->withQuestions()->create();
-        $member = User::factory()->activeCandidate()->create();
+        $member = User::factory()->memberOf($exam->organization)->activeCandidate()->create();
 
         $this->actingAs($lpk)->get(route('lpk.exams.show', $exam))->assertOk()->assertSee('Bayar manual');
         $this->actingAs($lpk)->post(route('lpk.exams.publish.manual', $exam), ['proof' => $this->proof()])->assertSessionHasNoErrors();
@@ -98,7 +98,7 @@ class ManualPaymentTest extends TestCase
     public function test_worker_joins_a_session_by_transfer_and_can_resend_after_a_rejection(): void
     {
         $exam = Exam::factory()->upcoming()->create();
-        $worker = User::factory()->activeCandidate()->create();
+        $worker = User::factory()->memberOf($exam->organization)->activeCandidate()->create();
         $register = fn (array $data = []) => $this->actingAs($worker)->post(route('worker.sessions.register', $exam), [
             'qualification_confirmed' => '1', 'pay_with' => 'manual', ...$data,
         ]);

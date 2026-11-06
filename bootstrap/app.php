@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsurePaymentDemoKey;
 use App\Http\Middleware\EnsureUserHasRole;
 use App\Http\Middleware\EnsureUserIsApproved;
+use App\Http\Middleware\ResolveTenant;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -22,7 +23,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // Midtrans calls this from its servers; requests are verified by signature instead.
         $middleware->validateCsrfTokens(except: ['midtrans/notification']);
 
-        $middleware->web(append: [
+        $middleware->web(prepend: [
+            ResolveTenant::class,
+        ], append: [
             EnsureUserIsApproved::class,
         ]);
 

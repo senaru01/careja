@@ -16,7 +16,7 @@ class QrisPaymentController extends Controller
     {
         $user = $request->user();
 
-        abort_unless($qris->isAvailable(), 503, 'Pembayaran QRIS otomatis belum tersedia.');
+        abort_unless($qris->isAvailableForMembership($user), 503, 'Pembayaran QRIS otomatis belum tersedia.');
         abort_unless(
             $user->hasCompleteCandidateProfile() && ! $user->hasPendingPayment() && ! $user->hasActiveMembership(),
             403,

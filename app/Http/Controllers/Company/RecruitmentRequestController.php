@@ -16,8 +16,8 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\View\View;
 
 /**
- * Recruitment requests of a company: the positions it needs, followed up
- * by an LPK with a test session.
+ * Recruitment requests of a company: the positions it needs, sent to the
+ * connected LPKs it picks and followed up by one of them with a test session.
  */
 class RecruitmentRequestController extends Controller
 {
@@ -33,9 +33,16 @@ class RecruitmentRequestController extends Controller
         ]);
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
-        return view('company.recruitments.form', ['recruitment' => new RecruitmentRequest]);
+        $connectedLpks = $request->user()->organization->connectedLpks()->get();
+
+        return view('company.recruitments.form', [
+            'recruitment' => new RecruitmentRequest,
+            'connectedLpks' => $connectedLpks,
+            // A new request goes to every connected LPK unless the company unticks some.
+            'selectedLpkIds' => $connectedLpks->modelKeys(),
+        ]);
     }
 
     public function store(RecruitmentRequestRequest $request): RedirectResponse
@@ -47,11 +54,15 @@ class RecruitmentRequestController extends Controller
                 'created_by' => $request->user()->id,
             ])->save();
             $recruitment->syncPositions($request->positions());
+            $recruitment->lpks()->sync($request->lpkIds());
 
             return $recruitment;
         });
 
-        Notification::send(User::where('role', UserRole::Lpk)->whereNotNull('approved_at')->get(), new RecruitmentRequested($recruitment));
+        Notification::send(
+            User::where('role', UserRole::Lpk)->whereIn('organization_id', $request->lpkIds())->whereNotNull('approved_at')->get(),
+            new RecruitmentRequested($recruitment),
+        );
 
         return redirect()->route('company.recruitments.show', $recruitment)
             ->with('status', 'Permintaan rekrutmen dikirim. LPK akan menindaklanjuti dengan sesi tes.');
@@ -61,7 +72,7 @@ class RecruitmentRequestController extends Controller
     {
         Gate::authorize('view', $recruitment);
 
-        $recruitment->load(['positions', 'creator', 'exams' => fn ($query) => $query->with('organization')->withCount('participants')->latest()]);
+        $recruitment->load(['positions', 'creator', 'lpks', 'exams' => fn ($query) => $query->with('organization')->withCount('participants')->latest()]);
 
         return view('company.recruitments.show', [
             'recruitment' => $recruitment,
@@ -69,11 +80,15 @@ class RecruitmentRequestController extends Controller
         ]);
     }
 
-    public function edit(RecruitmentRequest $recruitment): View
+    public function edit(Request $request, RecruitmentRequest $recruitment): View
     {
         Gate::authorize('update', $recruitment);
 
-        return view('company.recruitments.form', ['recruitment' => $recruitment->load('positions')]);
+        return view('company.recruitments.form', [
+            'recruitment' => $recruitment->load('positions'),
+            'connectedLpks' => $request->user()->organization->connectedLpks()->get(),
+            'selectedLpkIds' => $recruitment->lpks()->pluck('organizations.id')->all(),
+        ]);
     }
 
     public function update(RecruitmentRequestRequest $request, RecruitmentRequest $recruitment): RedirectResponse
@@ -83,6 +98,7 @@ class RecruitmentRequestController extends Controller
         DB::transaction(function () use ($request, $recruitment) {
             $recruitment->update($request->safe()->only(['title', 'description', 'needed_by']));
             $recruitment->syncPositions($request->positions());
+            $recruitment->lpks()->sync($request->lpkIds());
         });
 
         return redirect()->route('company.recruitments.show', $recruitment)->with('status', 'Permintaan rekrutmen diperbarui.');

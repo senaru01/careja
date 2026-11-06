@@ -54,7 +54,7 @@ class ExamSessionController extends Controller
             'pendingInterviewPayment' => $exam->pendingInterviewAccessPayment(),
             'rejectedInterviewPayment' => $exam->latestRejectedPayment(PaymentPurpose::InterviewAccess),
             'qrisAvailable' => $qris->isAvailable(),
-            'interviewFee' => config('careja.interview_fee'),
+            'interviewFee' => PaymentPurpose::InterviewAccess->fee($exam->organization),
         ]);
     }
 }

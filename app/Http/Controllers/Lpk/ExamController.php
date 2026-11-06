@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Lpk;
 
-use App\Enums\OrganizationType;
 use App\Enums\PaymentPurpose;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Lpk\ExamRequest;
@@ -57,7 +56,7 @@ class ExamController extends Controller
             ]),
             'positions' => $recruitment?->positions ?? collect(),
             'recruitment' => $recruitment,
-            'companies' => $this->companies(),
+            'companies' => $this->companies($request->user()->organization),
         ]);
     }
 
@@ -103,7 +102,7 @@ class ExamController extends Controller
             'rejectedPayment' => $exam->isPublished() ? null : $exam->latestRejectedPayment(PaymentPurpose::ExamSession),
             'qrisAvailable' => $qris->isAvailable(),
             'publishCheck' => Gate::inspect('publish', $exam),
-            'fee' => config('careja.exam_session_fee'),
+            'fee' => PaymentPurpose::ExamSession->fee($exam->organization),
             'participants' => $exam->attempts->filter->isRegistered(),
             'rankingGroups' => $exam->hasEnded() ? $exam->rankingGroups() : collect(),
             'startCheck' => Gate::inspect('start', $exam),
@@ -122,7 +121,7 @@ class ExamController extends Controller
             'exam' => $exam,
             'positions' => $exam->positions,
             'recruitment' => $exam->recruitmentRequest,
-            'companies' => $this->companies(),
+            'companies' => $this->companies($exam->organization),
         ]);
     }
 
@@ -148,10 +147,12 @@ class ExamController extends Controller
     }
 
     /**
+     * The companies this LPK is connected to: the only ones it can run sessions for.
+     *
      * @return Collection<int, string>
      */
-    private function companies(): Collection
+    private function companies(Organization $lpk): Collection
     {
-        return Organization::where('type', OrganizationType::Company)->orderBy('name')->pluck('name', 'id');
+        return $lpk->connectedCompanies()->pluck('name', 'organizations.id');
     }
 }

@@ -142,7 +142,8 @@ class ExamPolicy
      */
     public function register(User $user, Exam $exam): Response
     {
-        if (! $user->isWorker() || ! $exam->isPublished()) {
+        // Members only see the sessions of their own LPK.
+        if (! $user->isWorker() || ! $exam->isPublished() || $user->organization_id !== $exam->organization_id) {
             return Response::denyAsNotFound();
         }
 

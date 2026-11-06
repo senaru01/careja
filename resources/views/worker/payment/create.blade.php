@@ -25,7 +25,7 @@
                 {{-- Nothing to pay: the membership banner above shows the status. --}}
             @elseif (! $canUpload)
                 <x-card title="Pembayaran Diproses">
-                    <p class="text-sm text-slate-600">Bukti pembayaran Anda sudah terkirim dan sedang diverifikasi admin.</p>
+                    <p class="text-sm text-slate-600">Bukti pembayaran Anda sudah terkirim dan sedang diverifikasi {{ $paysLpkDirectly ? $lpk->name : 'admin' }}.</p>
                 </x-card>
             @else
                 {{-- Choose how to pay --}}
@@ -37,7 +37,7 @@
                         <div>
                             <div class="text-sm text-blue-100">{{ $membershipExpired ? 'Perpanjang keanggotaan' : 'Aktifkan akun Anda' }}</div>
                             <div class="mt-1 text-5xl font-extrabold tracking-tight">Rp {{ number_format($fee, 0, ',', '.') }}</div>
-                            <div class="text-sm text-blue-100">berlaku {{ $membershipLabel }} · biaya ikut tes per sesi Rp {{ number_format(config('careja.exam_registration_fee'), 0, ',', '.') }}</div>
+                            <div class="text-sm text-blue-100">berlaku {{ $membershipLabel }} · biaya ikut tes per sesi Rp {{ number_format($examFee, 0, ',', '.') }}</div>
                         </div>
 
                         @if ($qrisAvailable)
@@ -59,10 +59,24 @@
                 {{-- Manual fallback: static QRIS + proof upload --}}
                 <details class="panel p-6" @if (! $qrisAvailable || $errors->has('proof')) open @endif>
                     <summary class="cursor-pointer text-sm font-semibold text-slate-700">
-                        {{ $qrisAvailable ? 'Atau bayar manual & unggah bukti transfer' : 'Bayar via QRIS & unggah bukti' }}
+                        {{ $qrisAvailable ? 'Atau bayar manual & unggah bukti transfer' : ($paysLpkDirectly ? 'Transfer ke rekening '.$lpk->name.' & unggah bukti' : 'Bayar via QRIS & unggah bukti') }}
                     </summary>
 
                     <div class="mt-5 grid sm:grid-cols-2 gap-6 items-center">
+                        @if ($paysLpkDirectly)
+                            <div class="rounded-2xl bg-blue-50 p-5 text-sm ring-1 ring-blue-100">
+                                @if ($lpk->hasBankAccount())
+                                    <div class="text-slate-500">Bank</div>
+                                    <div class="font-semibold text-slate-900">{{ $lpk->bank_name }}</div>
+                                    <div class="mt-3 text-slate-500">Nomor rekening</div>
+                                    <div class="text-2xl font-bold tracking-wide text-blue-900">{{ $lpk->bank_account_number }}</div>
+                                    <div class="mt-3 text-slate-500">Atas nama</div>
+                                    <div class="font-semibold text-slate-900">{{ $lpk->bank_account_holder ?: $lpk->name }}</div>
+                                @else
+                                    <p class="text-amber-800">Rekening {{ $lpk->name }} belum diisi. Silakan hubungi LPK Anda.</p>
+                                @endif
+                            </div>
+                        @else
                         <div class="text-center">
                             @if (file_exists(public_path($qrisImage)))
                                 <img src="{{ asset($qrisImage) }}" alt="QRIS {{ $qrisMerchant }}" class="mx-auto max-w-56 rounded-2xl ring-1 ring-slate-200">
@@ -72,11 +86,18 @@
                                 </div>
                             @endif
                         </div>
+                        @endif
                         <div class="space-y-3 text-sm">
                             <ol class="list-decimal ms-5 space-y-1 text-slate-700">
-                                <li>Bayar Rp {{ number_format($fee, 0, ',', '.') }} ke QRIS {{ $qrisMerchant }}.</li>
-                                <li>Unggah screenshot / bukti pembayaran.</li>
-                                <li>Admin memverifikasi, lalu akun aktif.</li>
+                                @if ($paysLpkDirectly)
+                                    <li>Transfer Rp {{ number_format($fee, 0, ',', '.') }} ke rekening {{ $lpk->name }}.</li>
+                                    <li>Unggah screenshot / bukti transfer.</li>
+                                    <li>{{ $lpk->name }} memverifikasi, lalu akun aktif.</li>
+                                @else
+                                    <li>Bayar Rp {{ number_format($fee, 0, ',', '.') }} ke QRIS {{ $qrisMerchant }}.</li>
+                                    <li>Unggah screenshot / bukti pembayaran.</li>
+                                    <li>Admin memverifikasi, lalu akun aktif.</li>
+                                @endif
                             </ol>
                             <form method="POST" action="{{ route('worker.payment.store') }}" enctype="multipart/form-data" class="space-y-3">
                                 @csrf

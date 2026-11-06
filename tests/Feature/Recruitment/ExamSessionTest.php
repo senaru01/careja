@@ -78,7 +78,7 @@ class ExamSessionTest extends TestCase
     {
         $lpk = User::factory()->lpk()->create();
         $exam = Exam::factory()->for($lpk->organization)->draft()->withQuestions()->create();
-        $member = User::factory()->activeCandidate()->create();
+        $member = User::factory()->memberOf($exam->organization)->activeCandidate()->create();
         $unpaidWorker = User::factory()->create();
 
         $this->fakeCharge();
@@ -121,7 +121,7 @@ class ExamSessionTest extends TestCase
     {
         $exam = Exam::factory()->draft()->create();
 
-        $this->actingAs(User::factory()->activeCandidate()->create())
+        $this->actingAs(User::factory()->memberOf($exam->organization)->activeCandidate()->create())
             ->get(route('worker.sessions.show', $exam))
             ->assertNotFound();
     }
@@ -129,7 +129,7 @@ class ExamSessionTest extends TestCase
     public function test_worker_must_confirm_the_qualifications(): void
     {
         $exam = Exam::factory()->upcoming()->withQuestions()->create();
-        $worker = User::factory()->activeCandidate()->create();
+        $worker = User::factory()->memberOf($exam->organization)->activeCandidate()->create();
 
         $this->actingAs($worker)
             ->post(route('worker.sessions.register', $exam), ['pay_with' => 'qris'])
@@ -141,7 +141,7 @@ class ExamSessionTest extends TestCase
     public function test_worker_pays_6500_and_becomes_ready_for_the_test(): void
     {
         $exam = Exam::factory()->upcoming()->withQuestions()->create();
-        $worker = User::factory()->activeCandidate()->create();
+        $worker = User::factory()->memberOf($exam->organization)->activeCandidate()->create();
 
         $this->fakeCharge();
         $this->actingAs($worker)->post(route('worker.sessions.register', $exam), $this->registration())
@@ -189,7 +189,7 @@ class ExamSessionTest extends TestCase
     {
         $exam = Exam::factory()->withQuestions()->create();
 
-        $this->actingAs(User::factory()->activeCandidate()->create())
+        $this->actingAs(User::factory()->memberOf($exam->organization)->activeCandidate()->create())
             ->post(route('worker.sessions.register', $exam), $this->registration())
             ->assertForbidden();
     }
@@ -279,7 +279,7 @@ class ExamSessionTest extends TestCase
     public function test_token_pays_for_another_session(): void
     {
         $exam = Exam::factory()->upcoming()->withQuestions()->create();
-        $worker = User::factory()->activeCandidate()->create();
+        $worker = User::factory()->memberOf($exam->organization)->activeCandidate()->create();
         ExamToken::factory()->for($worker)->create();
 
         $this->actingAs($worker)->post(route('worker.sessions.register', $exam), $this->registration('token'))
@@ -294,7 +294,7 @@ class ExamSessionTest extends TestCase
     public function test_worker_without_tokens_can_not_pay_with_one(): void
     {
         $exam = Exam::factory()->upcoming()->withQuestions()->create();
-        $worker = User::factory()->activeCandidate()->create();
+        $worker = User::factory()->memberOf($exam->organization)->activeCandidate()->create();
 
         $this->actingAs($worker)->post(route('worker.sessions.register', $exam), $this->registration('token'))
             ->assertSessionHasErrors('pay_with');
@@ -307,14 +307,14 @@ class ExamSessionTest extends TestCase
         $exam = Exam::factory()->upcoming()->create(['position' => 'Juru Las SMAW', 'quota' => 7]);
         Exam::factory()->draft()->create(['position' => 'Sesi Draf Rahasia']);
 
-        $this->actingAs(User::factory()->activeCandidate()->create())
+        $this->actingAs(User::factory()->memberOf($exam->organization)->activeCandidate()->create())
             ->get(route('worker.sessions.index'))
             ->assertOk()
             ->assertSee('Juru Las SMAW')
             ->assertSee('Butuh 7 orang')
             ->assertDontSee('Sesi Draf Rahasia');
 
-        $this->actingAs(User::factory()->activeCandidate()->create())
+        $this->actingAs(User::factory()->memberOf($exam->organization)->activeCandidate()->create())
             ->get(route('worker.sessions.show', $exam))
             ->assertOk()
             ->assertSee('memenuhi kualifikasi')

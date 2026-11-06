@@ -39,7 +39,7 @@ class ExamSessions
     }
 
     /**
-     * The LPK paid: the session goes live and every active member is told.
+     * The LPK paid: the session goes live and every active member of that LPK is told.
      */
     private function publish(Payment $payment): ?Closure
     {
@@ -51,7 +51,10 @@ class ExamSessions
 
         $exam->forceFill(['published_at' => now()])->save();
 
-        return fn () => Notification::send(User::activeCandidates()->get(), new ExamSessionPublished($exam));
+        return fn () => Notification::send(
+            User::activeCandidates()->where('organization_id', $exam->organization_id)->get(),
+            new ExamSessionPublished($exam),
+        );
     }
 
     /**

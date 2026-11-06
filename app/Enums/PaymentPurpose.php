@@ -2,6 +2,8 @@
 
 namespace App\Enums;
 
+use App\Models\Organization;
+
 enum PaymentPurpose: string
 {
     case Membership = 'membership';
@@ -22,9 +24,17 @@ enum PaymentPurpose: string
     }
 
     /**
-     * Current price in Rupiah, as listed in the payment catalog.
+     * Price in Rupiah: the LPK's own price when it set one, otherwise the default.
      */
-    public function fee(): int
+    public function fee(?Organization $lpk = null): int
+    {
+        return $lpk ? $lpk->feeFor($this) : $this->defaultFee();
+    }
+
+    /**
+     * Default price in Rupiah from config/careja.php, as listed in the payment catalog.
+     */
+    public function defaultFee(): int
     {
         return (int) config(match ($this) {
             self::Membership => 'careja.registration_fee',

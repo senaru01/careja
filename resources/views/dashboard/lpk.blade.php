@@ -70,9 +70,9 @@
                 @endforelse
             </x-card>
 
-            <x-card title="Kandidat Aktif">
+            <x-card title="Member Aktif">
                 <x-slot name="actions">
-                    <a class="text-sm font-semibold text-blue-700 hover:underline" href="{{ route('candidates.index') }}">Semua kandidat ({{ $stats['Kandidat Aktif'] }})</a>
+                    <a class="text-sm font-semibold text-blue-700 hover:underline" href="{{ route('candidates.index') }}">Semua member ({{ $stats['Member Aktif'] }})</a>
                 </x-slot>
                 <p class="mb-4 text-sm text-slate-500">Semua pencari kerja dengan keanggotaan aktif, termasuk yang belum ikut sesi tes. Hubungi lewat WhatsApp jika ada yang perlu dikonfirmasi.</p>
                 @if ($activeCandidates->isEmpty())

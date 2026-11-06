@@ -45,6 +45,10 @@
                         <div class="text-xs text-slate-500">{{ $recruitment->creator?->name }}</div>
                     </div>
                 </div>
+                <div class="mb-4 text-sm">
+                    <span class="text-slate-500">Dikirim ke:</span>
+                    <span class="font-medium text-slate-900">{{ $recruitment->lpks->pluck('name')->implode(', ') ?: '-' }}</span>
+                </div>
                 <x-position-table :positions="$recruitment->positions" />
                 @if ($recruitment->description)
                     <p class="mt-4 text-sm text-slate-700 whitespace-pre-line">{{ $recruitment->description }}</p>

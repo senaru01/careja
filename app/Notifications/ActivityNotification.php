@@ -2,6 +2,8 @@
 
 namespace App\Notifications;
 
+use App\Models\User;
+use App\Services\Tenancy;
 use Illuminate\Notifications\Notification;
 
 /**
@@ -19,5 +21,19 @@ abstract class ActivityNotification extends Notification
     public function via(object $notifiable): array
     {
         return config('careja.activity_emails') ? ['mail'] : [];
+    }
+
+    /**
+     * Link to a page on the recipient's own site: their LPK's or company's
+     * subdomain, or the root domain for the super admin, since every account
+     * only logs in on its own address.
+     *
+     * @param  mixed  $parameters
+     */
+    protected function linkFor(object $notifiable, string $routeName, $parameters = []): string
+    {
+        $site = $notifiable instanceof User && ! $notifiable->isSuperAdmin() ? $notifiable->organization : null;
+
+        return app(Tenancy::class)->url($site, route($routeName, $parameters, absolute: false));
     }
 }

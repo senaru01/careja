@@ -24,20 +24,20 @@ class PaymentReviewed extends ActivityNotification
                     PaymentPurpose::MedicalCheckup => 'Perusahaan akan mencatat hasil medical checkup Anda setelah pemeriksaan.',
                     default => 'Terima kasih telah menggunakan Careja.',
                 })
-                ->action('Buka Dashboard', route('dashboard'));
+                ->action('Buka Dashboard', $this->linkFor($notifiable, 'dashboard'));
         }
 
         if ($this->payment->status === PaymentStatus::Verified) {
             return $message
                 ->subject('Pembayaran Pendaftaran Terverifikasi')
                 ->line('Pembayaran Anda telah diverifikasi. Profil Anda sekarang masuk ke daftar kandidat dan dapat dilihat oleh LPK dan perusahaan.')
-                ->action('Buka Dashboard', route('dashboard'));
+                ->action('Buka Dashboard', $this->linkFor($notifiable, 'dashboard'));
         }
 
         return $message
             ->subject('Pembayaran Pendaftaran Ditolak')
             ->line('Bukti pembayaran Anda ditolak dengan catatan: '.$this->payment->note)
             ->line('Silakan unggah ulang bukti pembayaran yang benar.')
-            ->action('Unggah Ulang', route('worker.payment.create'));
+            ->action('Unggah Ulang', $this->linkFor($notifiable, 'worker.payment.create'));
     }
 }

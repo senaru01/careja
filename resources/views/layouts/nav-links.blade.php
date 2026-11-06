@@ -17,6 +17,10 @@
         $links[] = ['lpk.recruitments.index', 'lpk.recruitments.*', 'Permintaan PT'];
         $links[] = ['lpk.categories.index', 'lpk.categories.*', 'Bank Soal'];
         $links[] = ['lpk.exams.index', 'lpk.exams.*', 'Sesi Tes'];
+
+        if ($user->organization?->collectsMembershipDirectly()) {
+            $links[] = ['lpk.payments.index', 'lpk.payments.*', 'Pembayaran Member'];
+        }
     }
 
     if ($user->isCompany()) {

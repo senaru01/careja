@@ -21,6 +21,7 @@ use App\Http\Controllers\Lpk\ExamPublicationController;
 use App\Http\Controllers\Lpk\ExamQuestionController;
 use App\Http\Controllers\Lpk\ExamRescheduleController;
 use App\Http\Controllers\Lpk\ExamStartController;
+use App\Http\Controllers\Lpk\PaymentController as LpkPaymentController;
 use App\Http\Controllers\Lpk\QuestionCategoryController;
 use App\Http\Controllers\Lpk\RecruitmentRequestController as LpkRecruitmentRequestController;
 use App\Http\Controllers\MidtransNotificationController;
@@ -159,6 +160,10 @@ Route::middleware('auth')->group(function () {
 
         Route::get('permintaan-rekrutmen', [LpkRecruitmentRequestController::class, 'index'])->name('recruitments.index');
 
+        Route::get('pembayaran', [LpkPaymentController::class, 'index'])->name('payments.index');
+        Route::get('pembayaran/{payment}/bukti', [LpkPaymentController::class, 'proof'])->name('payments.proof');
+        Route::patch('pembayaran/{payment}', [LpkPaymentController::class, 'update'])->name('payments.update');
+
         Route::put('hasil-tes/{attempt}/evaluasi', [AttemptEvaluationController::class, 'update'])->name('attempts.evaluate');
     });
 
@@ -198,6 +203,8 @@ Route::middleware('auth')->group(function () {
         Route::get('organisasi', [OrganizationController::class, 'index'])->name('organizations.index');
         Route::get('organisasi/tambah', [OrganizationController::class, 'create'])->name('organizations.create');
         Route::post('organisasi', [OrganizationController::class, 'store'])->name('organizations.store');
+        Route::get('organisasi/{organization}/ubah', [OrganizationController::class, 'edit'])->name('organizations.edit');
+        Route::put('organisasi/{organization}', [OrganizationController::class, 'update'])->name('organizations.update');
     });
 });
 

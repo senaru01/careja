@@ -42,6 +42,13 @@
                         :options="['passed' => 'Lulus', 'failed' => 'Tidak lulus', 'none' => 'Belum tes']"
                         :selected="$filters['theory'] ?? ''" />
                 </div>
+                @if ($lpks->count() > 1)
+                    <div>
+                        <x-input-label for="lpk" value="LPK" />
+                        <x-select id="lpk" name="lpk" class="mt-1 block w-full" placeholder="Semua"
+                            :options="$lpks" :selected="$filters['lpk'] ?? ''" />
+                    </div>
+                @endif
                 <div class="sm:col-span-4 lg:col-span-8 flex gap-2">
                     <x-primary-button>Filter</x-primary-button>
                     <a href="{{ route('candidates.index') }}"><x-secondary-button>Reset</x-secondary-button></a>
@@ -75,6 +82,9 @@
                                             <div>
                                                 <div class="font-medium text-slate-900">{{ $candidate->name }}</div>
                                                 <div class="text-slate-500">{{ $profile?->gender?->label() }}</div>
+                                                @if ($lpks->isNotEmpty())
+                                                    <div class="text-xs font-medium text-blue-700">{{ $candidate->organization?->name }}</div>
+                                                @endif
                                             </div>
                                         </div>
                                     </td>

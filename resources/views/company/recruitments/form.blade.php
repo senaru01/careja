@@ -35,6 +35,25 @@
                     </div>
 
                     <div>
+                        <x-input-label value="Kirim ke LPK" />
+                        @if ($connectedLpks->isEmpty())
+                            <p class="mt-1 rounded-2xl bg-amber-50 p-3 text-sm text-amber-800 ring-1 ring-amber-200">Perusahaan Anda belum terhubung ke LPK mana pun. Hubungi admin Careja untuk menghubungkan LPK.</p>
+                        @else
+                            <p class="mb-2 text-xs text-slate-500">Hanya LPK yang dicentang yang menerima permintaan ini.</p>
+                            @php($checkedLpkIds = array_map('intval', old('lpk_ids', $selectedLpkIds)))
+                            <div class="flex flex-wrap gap-3">
+                                @foreach ($connectedLpks as $lpk)
+                                    <label class="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm ring-1 ring-slate-200">
+                                        <input type="checkbox" name="lpk_ids[]" value="{{ $lpk->id }}" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" @checked(in_array($lpk->id, $checkedLpkIds, true))>
+                                        {{ $lpk->name }}
+                                    </label>
+                                @endforeach
+                            </div>
+                        @endif
+                        <x-input-error :messages="array_merge($errors->get('lpk_ids'), $errors->get('lpk_ids.*'))" class="mt-1" />
+                    </div>
+
+                    <div>
                         <x-input-label for="description" value="Keterangan untuk LPK (opsional)" />
                         <x-textarea id="description" name="description" class="mt-1 block w-full" rows="3"
                             placeholder="mis. lokasi kerja, sistem shift, kualifikasi tambahan seperti sehat jasmani dan tidak buta warna">{{ old('description', $recruitment->description) }}</x-textarea>

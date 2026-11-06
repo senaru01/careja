@@ -35,6 +35,9 @@
                             <x-select id="company_id" name="company_id" class="mt-1 block w-full" placeholder="Pilih perusahaan" required
                                 :options="$companies" :selected="old('company_id', $exam->company_id)" />
                             <x-input-error :messages="$errors->get('company_id')" class="mt-1" />
+                            @if ($companies->isEmpty())
+                                <p class="mt-1 text-xs text-amber-700">Belum ada perusahaan yang terhubung dengan LPK Anda. Hubungi admin Careja.</p>
+                            @endif
                         </div>
                     @endif
 

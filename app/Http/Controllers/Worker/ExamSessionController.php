@@ -28,6 +28,7 @@ class ExamSessionController extends Controller
 
         return view('worker.sessions.index', [
             'openSessions' => Exam::query()
+                ->where('organization_id', $user->organization_id)
                 ->whereNotNull('published_at')
                 ->where('starts_at', '>', now())
                 ->with(['organization', 'company'])
@@ -36,7 +37,7 @@ class ExamSessionController extends Controller
                 ->get(),
             'myAttempts' => $user->examAttempts()->with('exam.organization', 'exam.company')->get(),
             'tokens' => $user->availableExamTokens(),
-            'fee' => config('careja.exam_registration_fee'),
+            'fee' => PaymentPurpose::ExamRegistration->fee($user->organization),
             'isActiveMember' => $user->hasActiveMembership(),
         ]);
     }
@@ -44,7 +45,7 @@ class ExamSessionController extends Controller
     public function show(Request $request, Exam $exam, QrisPayments $qris): View
     {
         $user = $request->user();
-        abort_unless($exam->isPublished(), 404);
+        abort_unless($exam->isPublished() && $exam->organization_id === $user->organization_id, 404);
 
         $qris->syncPendingOf($user);
 
@@ -65,7 +66,7 @@ class ExamSessionController extends Controller
             'rejectedPayment' => $attempt?->isRegistered() ? null : $exam->latestRejectedPayment(PaymentPurpose::ExamRegistration, $user),
             'qrisAvailable' => $qris->isAvailable(),
             'tokens' => $user->availableExamTokens(),
-            'fee' => config('careja.exam_registration_fee'),
+            'fee' => PaymentPurpose::ExamRegistration->fee($exam->organization),
             'positionChecks' => $exam->positions->mapWithKeys(fn ($position) => [$position->id => $position->unmetRequirements($user)]),
             'rankingGroups' => $exam->hasEnded() ? $exam->rankingGroups() : collect(),
             'interviews' => $exam->hasEnded() ? $exam->interviews()->get()->keyBy('user_id') : collect(),

@@ -93,6 +93,17 @@ class UserFactory extends Factory
     }
 
     /**
+     * A job seeker who registered through the given LPK's subdomain.
+     */
+    public function memberOf(Organization $lpk): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => UserRole::Worker,
+            'organization_id' => $lpk->id,
+        ]);
+    }
+
+    /**
      * A job seeker with a complete profile, a CV and a verified registration payment.
      */
     public function activeCandidate(): static

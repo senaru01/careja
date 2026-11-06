@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\PaymentCollector;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentPurpose;
 use App\Enums\PaymentStatus;
@@ -24,22 +25,35 @@ class ManualPayments
     public function __construct(private readonly ExamSessions $sessions) {}
 
     /**
-     * Store the proof as a pending payment and tell the admins.
+     * Store the proof as a pending payment, at the LPK's price, and tell
+     * whoever verifies it: the LPK itself when its members pay the membership
+     * straight to the LPK's account, the Careja admins otherwise.
      */
     public function submit(User $payer, PaymentPurpose $purpose, UploadedFile $proof, ?Exam $exam = null): Payment
     {
+        $lpk = $exam?->organization ?? ($purpose === PaymentPurpose::Membership ? $payer->organization : null);
+        $collector = $purpose === PaymentPurpose::Membership && $lpk?->collectsMembershipDirectly()
+            ? PaymentCollector::Lpk
+            : PaymentCollector::Careja;
+
         $payment = $payer->payments()->make([
-            'amount' => $purpose->fee(),
+            'amount' => $purpose->fee($lpk),
             'proof_path' => $proof->store('payments', 'local'),
         ]);
         $payment->forceFill([
             'purpose' => $purpose,
             'exam_id' => $exam?->id,
+            'lpk_id' => $lpk?->id,
             'method' => PaymentMethod::Manual,
+            'collected_by' => $collector,
             'status' => PaymentStatus::Pending,
         ])->save();
 
-        Notification::send(User::superAdmins()->get(), new PaymentSubmitted($payment));
+        $verifiers = $collector === PaymentCollector::Lpk
+            ? $lpk->staff()->whereNotNull('approved_at')->get()
+            : User::superAdmins()->get();
+
+        Notification::send($verifiers, new PaymentSubmitted($payment));
 
         return $payment;
     }

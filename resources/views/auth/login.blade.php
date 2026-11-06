@@ -1,6 +1,12 @@
 <x-guest-layout>
     <x-slot name="title">Masuk</x-slot>
-    <x-slot name="subtitle">Gunakan email dan password akun Careja Anda.</x-slot>
+    <x-slot name="subtitle">
+        @if ($tenant)
+            Login untuk akun {{ $tenant->name }}.
+        @else
+            Login admin Careja. Member, LPK, dan perusahaan login lewat alamat masing-masing (contoh: namalpk.{{ config('careja.root_domain') }}).
+        @endif
+    </x-slot>
 
     <x-auth-session-status class="mb-4" :status="session('status')" />
 
@@ -32,8 +38,10 @@
 
         <x-primary-button class="w-full py-3">Masuk</x-primary-button>
 
-        <p class="text-center text-sm text-slate-500">
-            Belum punya akun? <a class="font-semibold text-blue-700 hover:underline" href="{{ route('register') }}">Daftar sebagai pencari kerja</a>
-        </p>
+        @if (! $tenant?->isCompany())
+            <p class="text-center text-sm text-slate-500">
+                Belum punya akun? <a class="font-semibold text-blue-700 hover:underline" href="{{ route('register') }}">Daftar sebagai pencari kerja</a>
+            </p>
+        @endif
     </form>
 </x-guest-layout>

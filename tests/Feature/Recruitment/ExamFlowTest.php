@@ -47,10 +47,24 @@ class ExamFlowTest extends TestCase
         ];
     }
 
+    public function test_lpk_only_runs_sessions_for_connected_companies(): void
+    {
+        $lpk = User::factory()->lpk()->create();
+        $connected = Organization::factory()->connectedTo($lpk->organization)->create(['name' => 'PT Terhubung']);
+        $stranger = Organization::factory()->company()->create(['name' => 'PT Asing']);
+
+        $this->actingAs($lpk)->get(route('lpk.exams.create'))
+            ->assertSee('PT Terhubung')
+            ->assertDontSee('PT Asing');
+
+        $this->actingAs($lpk)->post(route('lpk.exams.store'), $this->sessionData($stranger))->assertSessionHasErrors('company_id');
+        $this->actingAs($lpk)->post(route('lpk.exams.store'), $this->sessionData($connected))->assertSessionHasNoErrors();
+    }
+
     public function test_lpk_creates_a_draft_session_for_a_company_and_adds_questions(): void
     {
         $lpk = User::factory()->lpk()->create();
-        $company = Organization::factory()->company()->create();
+        $company = Organization::factory()->connectedTo($lpk->organization)->create();
 
         $this->actingAs($lpk)->get(route('lpk.exams.create'))->assertOk();
         $this->actingAs($lpk)->post(route('lpk.exams.store'), $this->sessionData($company))->assertSessionHasNoErrors();

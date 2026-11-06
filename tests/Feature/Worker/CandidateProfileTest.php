@@ -4,6 +4,7 @@ namespace Tests\Feature\Worker;
 
 use App\Models\CandidateDocument;
 use App\Models\CandidateSkill;
+use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -114,14 +115,14 @@ class CandidateProfileTest extends TestCase
     public function test_documents_are_visible_to_owner_and_partners_of_active_candidates_only(): void
     {
         Storage::fake('local');
-        $candidate = User::factory()->activeCandidate()->create();
+        $candidate = User::factory()->memberOf(Organization::factory()->lpk()->create())->activeCandidate()->create();
         $document = $candidate->documents()->first();
         Storage::disk('local')->put($document->path, 'pdf');
 
         $unpaidDocument = CandidateDocument::factory()->create();
         Storage::disk('local')->put($unpaidDocument->path, 'pdf');
 
-        $lpk = User::factory()->lpk()->create();
+        $lpk = User::factory()->lpk($candidate->organization)->create();
 
         $this->actingAs($candidate)->get(route('documents.show', $document))->assertOk();
         $this->actingAs($lpk)->get(route('documents.show', $document))->assertOk();

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\EducationLevel;
+use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -11,8 +12,9 @@ use Illuminate\View\View;
 class CandidateController extends Controller
 {
     /**
-     * List candidates whose registration is paid, with filters. Visible to
-     * LPK, company and super admin so everyone looks at the same data.
+     * List candidates whose membership is paid, with filters. An LPK sees its
+     * own members, a company the members of its connected LPKs, the super
+     * admin everyone.
      */
     public function index(Request $request): View
     {
@@ -24,10 +26,17 @@ class CandidateController extends Controller
             'min_age' => ['nullable', 'integer', 'min:15', 'max:70'],
             'max_age' => ['nullable', 'integer', 'min:15', 'max:70'],
             'experience' => ['nullable', 'in:fresh,experienced'],
+            'lpk' => ['nullable', 'integer'],
         ]);
 
+        $viewer = $request->user();
+        $lpkIds = $viewer->visibleLpkIds();
+        $lpks = Organization::lpks()->when($lpkIds !== null, fn (Builder $query) => $query->whereIn('id', $lpkIds))->orderBy('name')->pluck('name', 'id');
+
         $candidates = User::activeCandidates()
-            ->with(['candidateProfile', 'skills', 'workExperiences', 'examAttempts' => fn ($query) => $query->whereNotNull('submitted_at')])
+            ->candidatesOf($viewer)
+            ->when($filters['lpk'] ?? null, fn (Builder $query, int|string $lpk) => $query->where('organization_id', $lpk))
+            ->with(['organization', 'candidateProfile', 'skills', 'workExperiences', 'examAttempts' => fn ($query) => $query->whereNotNull('submitted_at')])
             ->when($filters['search'] ?? null, fn (Builder $query, string $search) => $query->where(
                 fn (Builder $query) => $query->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%")
             ))
@@ -50,6 +59,8 @@ class CandidateController extends Controller
             'candidates' => $candidates,
             'filters' => $filters,
             'educationLevels' => EducationLevel::cases(),
+            // An LPK only sees its own members, so the LPK filter is for companies and the admin.
+            'lpks' => $viewer->isLpk() ? collect() : $lpks,
         ]);
     }
 

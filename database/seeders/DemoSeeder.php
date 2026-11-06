@@ -18,8 +18,9 @@ class DemoSeeder extends Seeder
 {
     public function run(): void
     {
-        $lpk = Organization::factory()->lpk()->create(['name' => 'LPK Demo Sejahtera']);
-        $company = Organization::factory()->company()->create(['name' => 'PT Demo Industri']);
+        // Open them on lpkdemo.<root domain> and ptdemo.<root domain> (locally: lpkdemo.localhost:8000).
+        $lpk = Organization::factory()->lpk()->create(['name' => 'LPK Demo Sejahtera', 'subdomain' => 'lpkdemo']);
+        $company = Organization::factory()->connectedTo($lpk)->create(['name' => 'PT Demo Industri', 'subdomain' => 'ptdemo']);
 
         User::factory()->lpk($lpk)->create(['name' => 'Admin LPK Demo', 'email' => 'lpk@demo.test']);
         User::factory()->company($company)->create(['name' => 'HRD PT Demo', 'email' => 'hrd@demo.test']);
@@ -48,7 +49,7 @@ class DemoSeeder extends Seeder
         ]);
 
         foreach (range(1, 3) as $number) {
-            $candidate = User::factory()->activeCandidate()->create([
+            $candidate = User::factory()->memberOf($lpk)->activeCandidate()->create([
                 'name' => "Kandidat Demo {$number}",
                 'email' => "kandidat{$number}@demo.test",
             ]);

@@ -3,6 +3,7 @@
 namespace Tests\Feature\Recruitment;
 
 use App\Models\Exam;
+use App\Models\Organization;
 use App\Models\RecruitmentRequest;
 use App\Models\User;
 use App\Notifications\RecruitmentRequested;
@@ -41,11 +42,11 @@ class RecruitmentRequestTest extends TestCase
 
     public function test_company_releases_a_request_with_a_position_table_and_lpks_are_told(): void
     {
-        $company = User::factory()->company()->create();
         $lpk = User::factory()->lpk()->create();
+        $company = User::factory()->company(Organization::factory()->connectedTo($lpk->organization)->create())->create();
 
         $this->actingAs($company)->get(route('company.recruitments.create'))->assertOk();
-        $this->actingAs($company)->post(route('company.recruitments.store'), $this->requestData())->assertSessionHasNoErrors();
+        $this->actingAs($company)->post(route('company.recruitments.store'), [...$this->requestData(), 'lpk_ids' => [$lpk->organization_id]])->assertSessionHasNoErrors();
 
         $recruitment = RecruitmentRequest::with('positions')->sole();
         $this->assertSame($company->organization_id, $recruitment->company_id);
@@ -61,6 +62,36 @@ class RecruitmentRequestTest extends TestCase
         $this->actingAs($company)->get(route('company.recruitments.edit', $recruitment))->assertOk();
         $this->actingAs($company)->get(route('company.recruitments.index'))->assertOk()->assertSee($recruitment->title);
         $this->actingAs($lpk)->get(route('dashboard'))->assertOk()->assertSee($recruitment->title);
+    }
+
+    public function test_request_only_goes_to_the_connected_lpks_the_company_ticked(): void
+    {
+        $chosen = User::factory()->lpk()->create();
+        $skipped = User::factory()->lpk()->create();
+        $unconnected = User::factory()->lpk()->create();
+        $company = User::factory()->company(Organization::factory()->connectedTo([$chosen->organization, $skipped->organization])->create())->create();
+
+        $this->actingAs($company)->get(route('company.recruitments.create'))
+            ->assertSee($chosen->organization->name)
+            ->assertSee($skipped->organization->name)
+            ->assertDontSee($unconnected->organization->name);
+
+        $this->actingAs($company)->post(route('company.recruitments.store'), [...$this->requestData(), 'lpk_ids' => [$unconnected->organization_id]])
+            ->assertSessionHasErrors('lpk_ids.0');
+        $this->actingAs($company)->post(route('company.recruitments.store'), $this->requestData())
+            ->assertSessionHasErrors('lpk_ids');
+
+        $this->actingAs($company)->post(route('company.recruitments.store'), [...$this->requestData(), 'lpk_ids' => [$chosen->organization_id]])
+            ->assertSessionHasNoErrors();
+        $recruitment = RecruitmentRequest::sole();
+
+        $this->assertSame([$chosen->organization_id], $recruitment->lpks->modelKeys());
+        Notification::assertSentTo($chosen, RecruitmentRequested::class);
+        Notification::assertNotSentTo([$skipped, $unconnected], RecruitmentRequested::class);
+
+        $this->actingAs($chosen)->get(route('lpk.recruitments.index'))->assertSee($recruitment->title);
+        $this->actingAs($skipped)->get(route('lpk.recruitments.index'))->assertDontSee($recruitment->title);
+        $this->actingAs($skipped)->get(route('lpk.exams.create', ['permintaan' => $recruitment->id]))->assertNotFound();
     }
 
     public function test_age_range_must_not_be_reversed(): void
@@ -87,7 +118,7 @@ class RecruitmentRequestTest extends TestCase
     public function test_lpk_turns_a_request_into_a_session_with_the_same_positions(): void
     {
         $lpk = User::factory()->lpk()->create();
-        $recruitment = RecruitmentRequest::factory()->withPositions(2)->create();
+        $recruitment = RecruitmentRequest::factory()->withPositions(2)->sentTo($lpk->organization)->create();
 
         $this->actingAs($lpk)->get(route('lpk.recruitments.index'))->assertOk()->assertSee($recruitment->title);
         $this->actingAs($lpk)->get(route('lpk.exams.create', ['permintaan' => $recruitment->id]))
@@ -117,8 +148,8 @@ class RecruitmentRequestTest extends TestCase
     public function test_session_from_a_request_must_be_for_the_requesting_company(): void
     {
         $lpk = User::factory()->lpk()->create();
-        $recruitment = RecruitmentRequest::factory()->withPositions(1)->create();
-        $otherCompany = User::factory()->company()->create()->organization;
+        $recruitment = RecruitmentRequest::factory()->withPositions(1)->sentTo($lpk->organization)->create();
+        $otherCompany = Organization::factory()->connectedTo($lpk->organization)->create();
 
         $this->actingAs($lpk)->post(route('lpk.exams.store'), [
             'title' => 'Tes',
@@ -135,14 +166,15 @@ class RecruitmentRequestTest extends TestCase
     public function test_request_is_locked_once_an_lpk_made_a_session_and_can_be_closed(): void
     {
         $company = User::factory()->company()->create();
-        $recruitment = RecruitmentRequest::factory()->withPositions()->for($company->organization, 'company')->create();
-        Exam::factory()->draft()->create(['company_id' => $company->organization_id, 'recruitment_request_id' => $recruitment->id]);
+        $lpk = User::factory()->lpk()->create();
+        $recruitment = RecruitmentRequest::factory()->withPositions()->for($company->organization, 'company')->sentTo($lpk->organization)->create();
+        Exam::factory()->for($lpk->organization)->draft()->create(['company_id' => $company->organization_id, 'recruitment_request_id' => $recruitment->id]);
 
         $this->actingAs($company)->get(route('company.recruitments.edit', $recruitment))->assertForbidden();
         $this->actingAs($company)->patch(route('company.recruitments.close', $recruitment))->assertRedirect();
 
         $this->assertTrue($recruitment->fresh()->isClosed());
-        $this->actingAs(User::factory()->lpk()->create())
+        $this->actingAs($lpk)
             ->get(route('lpk.exams.create', ['permintaan' => $recruitment->id]))
             ->assertForbidden();
     }

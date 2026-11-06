@@ -1,6 +1,6 @@
 <x-guest-layout>
     <x-slot name="title">Daftar</x-slot>
-    <x-slot name="subtitle">Buat akun pencari kerja. Akun langsung aktif setelah daftar.</x-slot>
+    <x-slot name="subtitle">Buat akun pencari kerja sebagai member {{ $lpk->name }}. Akun langsung aktif setelah daftar.</x-slot>
 
     <form method="POST" action="{{ route('register') }}" class="space-y-4">
         @csrf

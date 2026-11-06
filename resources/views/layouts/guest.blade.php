@@ -29,6 +29,9 @@
 
                     <div class="relative">
                         <div class="inline-flex rounded-3xl bg-white px-5 py-4 shadow-soft"><x-application-logo class="h-20" /></div>
+                        @if ($tenant)
+                            <div class="mt-5 inline-flex rounded-full bg-white/15 px-4 py-1.5 text-sm font-semibold ring-1 ring-white/30">{{ $tenant->name }}</div>
+                        @endif
                         <h2 class="mt-5 text-2xl font-semibold leading-tight tracking-tight">Cari Kerja yang Transparan, ya di Careja.</h2>
                         <p class="mt-3 text-sm text-blue-100">Pencari kerja, LPK, dan perusahaan melihat hasil seleksi yang sama. Sistem akan mengarahkan Anda ke menu sesuai hak akses.</p>
                     </div>
@@ -39,6 +42,9 @@
                 {{-- Form panel --}}
                 <div class="bg-slate-50/95 p-8 sm:p-10">
                     <a href="/" class="mb-6 inline-block md:hidden"><x-application-logo class="h-12" /></a>
+                    @if ($tenant)
+                        <div class="mb-4 text-sm font-semibold text-blue-800 md:hidden">{{ $tenant->name }}</div>
+                    @endif
                     @isset($title)
                         <h1 class="text-2xl font-semibold text-slate-900">{{ $title }}</h1>
                     @endisset

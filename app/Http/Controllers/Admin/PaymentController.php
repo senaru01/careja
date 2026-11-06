@@ -20,16 +20,17 @@ class PaymentController extends Controller
         $status = PaymentStatus::tryFrom($request->query('status', 'pending'));
 
         $payments = Payment::query()
-            ->with(['user', 'verifier', 'exam'])
+            ->with(['user', 'verifier', 'exam', 'lpk'])
             ->when($status, fn ($query) => $query->where('status', $status))
             ->latest()
             ->paginate(20)
             ->withQueryString();
 
-        return view('admin.payments.index', [
+        return view('payments.index', [
             'payments' => $payments,
             'status' => $status,
             'statuses' => PaymentStatus::cases(),
+            'routePrefix' => 'admin.payments',
         ]);
     }
 

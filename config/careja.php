@@ -4,6 +4,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Domain
+    |--------------------------------------------------------------------------
+    |
+    | Every LPK and company works on its own subdomain of `root_domain`, e.g.
+    | oki.careja.id. Job seekers who register there become members of that
+    | LPK, and staff can only log in on their own subdomain. The root domain
+    | itself has the landing page, the list of partner LPKs and the super
+    | admin login. Locally use "localhost": Chrome opens oki.localhost:8000.
+    |
+    */
+
+    'root_domain' => env('APP_ROOT_DOMAIN', 'localhost'),
+
+    'reserved_subdomains' => ['www', 'admin', 'api', 'app', 'mail', 'smtp', 'ftp', 'cpanel', 'webmail', 'demo', 'static', 'assets'],
+
+    /*
+    |--------------------------------------------------------------------------
     | Activity emails
     |--------------------------------------------------------------------------
     |
@@ -24,6 +41,9 @@ return [
     | Amount (in Rupiah) job seekers pay via QRIS before they appear in the
     | candidate list. A verified payment keeps the account active for
     | `membership_months` months, after which it has to be renewed.
+    |
+    | This and the fees below are defaults: the super admin can set every fee
+    | per LPK (menu LPK & Perusahaan).
     |
     */
 

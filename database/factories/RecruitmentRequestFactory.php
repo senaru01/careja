@@ -35,6 +35,17 @@ class RecruitmentRequestFactory extends Factory
         return $this->has(RecruitmentPosition::factory()->count($count), 'positions');
     }
 
+    /**
+     * Sent to the given LPK, which is connected to the requesting company.
+     */
+    public function sentTo(Organization $lpk): static
+    {
+        return $this->afterCreating(function (RecruitmentRequest $request) use ($lpk) {
+            $request->company->connectedLpks()->syncWithoutDetaching([$lpk->id]);
+            $request->lpks()->attach($lpk->id);
+        });
+    }
+
     public function closed(): static
     {
         return $this->state(fn (array $attributes) => [

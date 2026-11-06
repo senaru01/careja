@@ -17,6 +17,6 @@ class InterviewScheduled extends ActivityNotification
             ->line('Anda lolos tes teori dan diundang wawancara oleh '.$this->interview->organization->name.'.')
             ->line('Jadwal: '.$this->interview->scheduled_at->translatedFormat('l, d F Y H:i'))
             ->line('Tempat: '.$this->interview->location)
-            ->action('Lihat Detail', route('dashboard'));
+            ->action('Lihat Detail', $this->linkFor($notifiable, 'dashboard'));
     }
 }

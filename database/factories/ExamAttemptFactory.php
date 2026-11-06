@@ -21,7 +21,9 @@ class ExamAttemptFactory extends Factory
     {
         return [
             'exam_id' => Exam::factory()->withQuestions(),
-            'user_id' => User::factory()->activeCandidate(),
+            // Members only join sessions of their own LPK.
+            'user_id' => fn (array $attributes) => User::factory()->activeCandidate()
+                ->state(['organization_id' => Exam::find($attributes['exam_id'])?->organization_id]),
             'qualification_confirmed_at' => now()->subDay(),
             'registered_at' => now()->subDay(),
         ];

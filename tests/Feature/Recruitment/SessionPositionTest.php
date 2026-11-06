@@ -9,6 +9,7 @@ use App\Models\Exam;
 use App\Models\ExamAttempt;
 use App\Models\ExamPosition;
 use App\Models\ExamToken;
+use App\Models\Organization;
 use App\Models\Payment;
 use App\Models\User;
 use App\Models\WorkExperience;
@@ -20,9 +21,9 @@ class SessionPositionTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function worker(EducationLevel $education, int $age, int $experienceYears = 0): User
+    private function worker(EducationLevel $education, int $age, int $experienceYears = 0, ?Organization $lpk = null): User
     {
-        $worker = User::factory()->activeCandidate()->create();
+        $worker = User::factory()->activeCandidate()->create(['organization_id' => $lpk?->id]);
         $worker->candidateProfile->update(['education_level' => $education, 'birth_date' => now()->subYears($age)->subMonth()]);
 
         if ($experienceYears > 0) {
@@ -50,7 +51,7 @@ class SessionPositionTest extends TestCase
     {
         $exam = Exam::factory()->upcoming()->create();
         $operator = ExamPosition::factory()->for($exam)->create(['min_education' => EducationLevel::Sma, 'min_age' => 18, 'max_age' => 30]);
-        $worker = $this->worker(EducationLevel::Smk, 25);
+        $worker = $this->worker(EducationLevel::Smk, 25, lpk: $exam->organization);
 
         $this->actingAs($worker)->get(route('worker.sessions.show', $exam))->assertOk()->assertSee($operator->position);
         $this->actingAs($worker)->post(route('worker.sessions.register', $exam), $this->registration($operator))->assertSessionHasNoErrors();
@@ -66,14 +67,14 @@ class SessionPositionTest extends TestCase
         $qc = ExamPosition::factory()->for($exam)->create(['min_education' => EducationLevel::D3, 'min_age' => null, 'max_age' => null, 'min_experience_years' => 2]);
         $operator = ExamPosition::factory()->for($exam)->create(['min_education' => null, 'min_age' => 18, 'max_age' => 30]);
 
-        $smaGraduate = $this->worker(EducationLevel::Sma, 25, experienceYears: 3);
+        $smaGraduate = $this->worker(EducationLevel::Sma, 25, experienceYears: 3, lpk: $exam->organization);
         $this->actingAs($smaGraduate)->post(route('worker.sessions.register', $exam), $this->registration($qc))->assertSessionHasErrors('exam_position_id');
 
-        $tooOld = $this->worker(EducationLevel::S1, 40, experienceYears: 1);
+        $tooOld = $this->worker(EducationLevel::S1, 40, experienceYears: 1, lpk: $exam->organization);
         $this->actingAs($tooOld)->post(route('worker.sessions.register', $exam), $this->registration($operator))->assertSessionHasErrors('exam_position_id');
         $this->actingAs($tooOld)->post(route('worker.sessions.register', $exam), $this->registration($qc))->assertSessionHasErrors('exam_position_id');
 
-        $experienced = $this->worker(EducationLevel::D3, 28, experienceYears: 3);
+        $experienced = $this->worker(EducationLevel::D3, 28, experienceYears: 3, lpk: $exam->organization);
         $this->actingAs($experienced)->post(route('worker.sessions.register', $exam), $this->registration($qc))->assertSessionHasNoErrors();
 
         $this->assertSame(1, $exam->participants()->count());
@@ -84,9 +85,9 @@ class SessionPositionTest extends TestCase
         $exam = Exam::factory()->upcoming()->create();
         $forWomen = ExamPosition::factory()->for($exam)->unrestricted()->create(['gender' => Gender::Female]);
 
-        $man = $this->worker(EducationLevel::Sma, 25);
+        $man = $this->worker(EducationLevel::Sma, 25, lpk: $exam->organization);
         $man->candidateProfile->update(['gender' => Gender::Male]);
-        $woman = $this->worker(EducationLevel::Sma, 25);
+        $woman = $this->worker(EducationLevel::Sma, 25, lpk: $exam->organization);
         $woman->candidateProfile->update(['gender' => Gender::Female]);
 
         $this->actingAs($man)->get(route('worker.sessions.show', $exam))->assertSee('Khusus Perempuan');
@@ -101,7 +102,7 @@ class SessionPositionTest extends TestCase
         $exam = Exam::factory()->upcoming()->create();
         ExamPosition::factory()->for($exam)->unrestricted()->create();
         $foreign = ExamPosition::factory()->unrestricted()->create();
-        $worker = $this->worker(EducationLevel::Sma, 25);
+        $worker = $this->worker(EducationLevel::Sma, 25, lpk: $exam->organization);
 
         $this->actingAs($worker)->post(route('worker.sessions.register', $exam), ['qualification_confirmed' => '1', 'pay_with' => 'token'])
             ->assertSessionHasErrors('exam_position_id');

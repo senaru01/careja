@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Auth;
 
 use App\Models\User;
+use App\Services\Tenancy;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -63,7 +64,28 @@ class LoginRequest extends FormRequest
             ]);
         }
 
+        if (! $user->canLogInOn(app(Tenancy::class)->current())) {
+            throw ValidationException::withMessages([
+                'email' => $this->wrongSiteMessage($user),
+            ]);
+        }
+
         return $user;
+    }
+
+    /**
+     * Tell the user where their account lives, since every LPK and company
+     * logs in on its own subdomain.
+     */
+    private function wrongSiteMessage(User $user): string
+    {
+        $home = $user->isSuperAdmin() ? null : $user->organization;
+
+        if (! $user->isSuperAdmin() && ! $home?->subdomain) {
+            return 'Akun ini belum terhubung ke alamat LPK / perusahaan mana pun. Silakan hubungi admin Careja.';
+        }
+
+        return 'Akun ini tidak terdaftar di sini. Silakan login melalui '.app(Tenancy::class)->hostFor($home).'.';
     }
 
     /**

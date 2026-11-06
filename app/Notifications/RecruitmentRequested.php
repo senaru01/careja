@@ -29,6 +29,6 @@ class RecruitmentRequested extends ActivityNotification
             $message->line('Target mulai kerja: '.$recruitment->needed_by->translatedFormat('d F Y'));
         }
 
-        return $message->action('Buat Sesi Tes', route('lpk.recruitments.index'));
+        return $message->action('Buat Sesi Tes', $this->linkFor($notifiable, 'lpk.recruitments.index'));
     }
 }

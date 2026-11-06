@@ -149,7 +149,7 @@
                                 @else
                                     <div class="mt-2 rounded-2xl bg-amber-50 p-4 text-amber-900 ring-1 ring-amber-200">
                                         <div class="font-semibold">Selamat, Anda lolos wawancara!</div>
-                                        <p class="mt-1">Tahap akhir adalah medical checkup. Bayar biaya medical checkup Rp {{ number_format(config('careja.medical_checkup_fee'), 0, ',', '.') }} agar pemeriksaan dapat dijadwalkan.</p>
+                                        <p class="mt-1">Tahap akhir adalah medical checkup. Bayar biaya medical checkup Rp {{ number_format(\App\Enums\PaymentPurpose::MedicalCheckup->fee($interview->exam?->organization), 0, ',', '.') }} agar pemeriksaan dapat dijadwalkan.</p>
                                         @if ($qrisAvailable)
                                             <form method="POST" action="{{ route('worker.medical-payment.store', $interview) }}" class="mt-3">
                                                 @csrf

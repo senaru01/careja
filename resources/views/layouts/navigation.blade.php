@@ -10,7 +10,7 @@
 
             <div class="flex items-center gap-3">
                 <span class="hidden sm:inline-flex items-center rounded-full bg-blue-900 px-4 py-2 text-sm font-semibold text-white ring-4 ring-white/70">
-                    {{ $user->role->label() }}
+                    {{ $user->role->label() }}@if ($user->organization) · {{ $user->organization->name }}@endif
                 </span>
 
                 <form method="POST" action="{{ route('logout') }}">

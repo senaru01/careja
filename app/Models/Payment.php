@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\PaymentCollector;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentPurpose;
 use App\Enums\PaymentStatus;
@@ -35,7 +36,38 @@ class Payment extends Model
             'expires_at' => 'datetime',
             'payment_due_at' => 'datetime',
             'is_demo' => 'boolean',
+            'collected_by' => PaymentCollector::class,
         ];
+    }
+
+    /**
+     * The LPK the payment belongs to: the payer's LPK for a membership, the
+     * LPK running the session otherwise. Its prices and settings apply.
+     *
+     * @return BelongsTo<Organization, $this>
+     */
+    public function lpk(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class, 'lpk_id');
+    }
+
+    /**
+     * Determine if the money went straight to the LPK, which then verifies the proof itself.
+     */
+    public function isCollectedByLpk(): bool
+    {
+        return $this->collected_by === PaymentCollector::Lpk;
+    }
+
+    /**
+     * Scope a query to manual payments the given LPK receives and verifies itself.
+     *
+     * @param  Builder<Payment>  $query
+     */
+    #[Scope]
+    protected function collectedByLpk(Builder $query, Organization $lpk): void
+    {
+        $query->where('lpk_id', $lpk->id)->where('collected_by', PaymentCollector::Lpk);
     }
 
     /**

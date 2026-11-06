@@ -9,12 +9,14 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 
 /**
  * A company's request for new employees: the positions it needs and who
- * may apply. An LPK follows it up by turning it into a test session.
+ * may apply. It goes to the connected LPKs the company picked; one of them
+ * follows it up by turning it into a test session.
  */
 #[Fillable(['title', 'description', 'needed_by'])]
 class RecruitmentRequest extends Model
@@ -65,6 +67,32 @@ class RecruitmentRequest extends Model
     public function exams(): HasMany
     {
         return $this->hasMany(Exam::class);
+    }
+
+    /**
+     * The LPKs the company sent this request to (chosen from its connected LPKs).
+     *
+     * @return BelongsToMany<Organization, $this>
+     */
+    public function lpks(): BelongsToMany
+    {
+        return $this->belongsToMany(Organization::class, 'recruitment_request_lpk', 'recruitment_request_id', 'lpk_id')->orderBy('name');
+    }
+
+    /**
+     * Scope a query to requests sent to the given LPK.
+     *
+     * @param  Builder<RecruitmentRequest>  $query
+     */
+    #[Scope]
+    protected function sentTo(Builder $query, Organization $lpk): void
+    {
+        $query->whereHas('lpks', fn (Builder $lpks) => $lpks->whereKey($lpk->id));
+    }
+
+    public function isSentTo(?Organization $lpk): bool
+    {
+        return $lpk !== null && $this->lpks()->whereKey($lpk->id)->exists();
     }
 
     /**

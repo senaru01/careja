@@ -38,6 +38,18 @@ class ExamFactory extends Factory
     }
 
     /**
+     * A session is always for a company connected to the LPK running it.
+     */
+    public function configure(): static
+    {
+        return $this->afterCreating(function (Exam $exam) {
+            if ($exam->company_id) {
+                $exam->company->connectedLpks()->syncWithoutDetaching([$exam->organization_id]);
+            }
+        });
+    }
+
+    /**
      * Registration closed, participants wait for the LPK to start the test.
      */
     public function waitingForStart(): static

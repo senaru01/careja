@@ -38,14 +38,14 @@ class TwoFactorAuthenticationTest extends TestCase
 
     public function test_challenge_screen_can_be_rendered_after_valid_credentials(): void
     {
-        $this->startChallenge(User::factory()->create());
+        $this->startChallenge(User::factory()->superAdmin()->create());
 
         $this->get(route('two-factor.challenge'))->assertOk();
     }
 
     public function test_users_can_log_in_with_the_emailed_code(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->superAdmin()->create();
         $code = $this->startChallenge($user);
 
         $response = $this->post(route('two-factor.challenge'), ['code' => $code]);
@@ -57,7 +57,7 @@ class TwoFactorAuthenticationTest extends TestCase
 
     public function test_users_can_not_log_in_with_a_wrong_code(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->superAdmin()->create();
         $code = $this->startChallenge($user);
         $wrongCode = $code === '111111' ? '222222' : '111111';
 
@@ -69,7 +69,7 @@ class TwoFactorAuthenticationTest extends TestCase
 
     public function test_users_can_not_log_in_with_an_expired_code(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->superAdmin()->create();
         $code = $this->startChallenge($user);
 
         $this->travel(User::TWO_FACTOR_CODE_LIFETIME + 1)->minutes();
@@ -82,7 +82,7 @@ class TwoFactorAuthenticationTest extends TestCase
 
     public function test_code_can_not_be_reused_after_logging_in(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->superAdmin()->create();
         $code = $this->startChallenge($user);
         $this->post(route('two-factor.challenge'), ['code' => $code]);
         $this->post('/logout');
@@ -95,7 +95,7 @@ class TwoFactorAuthenticationTest extends TestCase
 
     public function test_challenge_is_locked_after_too_many_wrong_codes(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->superAdmin()->create();
         $code = $this->startChallenge($user);
         $wrongCode = $code === '111111' ? '222222' : '111111';
 
@@ -111,7 +111,7 @@ class TwoFactorAuthenticationTest extends TestCase
 
     public function test_a_new_code_can_be_requested_and_replaces_the_old_one(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->superAdmin()->create();
         $oldCode = $this->startChallenge($user);
 
         $this->post(route('two-factor.resend'))->assertSessionHas('status');
@@ -127,7 +127,7 @@ class TwoFactorAuthenticationTest extends TestCase
 
     public function test_access_revoked_during_the_challenge_blocks_the_login(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->superAdmin()->create();
         $code = $this->startChallenge($user);
         $user->revokeApproval();
 

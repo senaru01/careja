@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Enums\PaymentPurpose;
 use App\Models\Exam;
 use Illuminate\Notifications\Messages\MailMessage;
 
@@ -32,7 +33,7 @@ class ExamSessionPublished extends ActivityNotification
 
         return $message
             ->line('Jadwal tes: '.$exam->starts_at->translatedFormat('l, d F Y H:i').' WIB (tes dikerjakan bersama di ruangan, dimulai oleh pengawas LPK)')
-            ->line('Biaya ikut tes: Rp '.number_format(config('careja.exam_registration_fee'), 0, ',', '.').'. Daftar hanya jika Anda memenuhi kualifikasi di atas.')
-            ->action('Lihat & Daftar', route('worker.sessions.show', $exam));
+            ->line('Biaya ikut tes: Rp '.number_format(PaymentPurpose::ExamRegistration->fee($exam->organization), 0, ',', '.').'. Daftar hanya jika Anda memenuhi kualifikasi di atas.')
+            ->action('Lihat & Daftar', $this->linkFor($notifiable, 'worker.sessions.show', $exam));
     }
 }
